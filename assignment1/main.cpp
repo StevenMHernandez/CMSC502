@@ -26,6 +26,11 @@ struct points_container {
     point *points;
 };
 
+/**
+ *
+ * Load data from file
+ *
+ */
 int get_file_line_count(char *filename) {
     int count = 0;
 
@@ -67,6 +72,39 @@ points_container *get_the_points(char *filename) {
     return container;
 }
 
+/**
+ * Calculate Distances
+ */
+//struct point {
+//    double x;
+//    double y;
+//};
+
+double *get_distance_matrix(points_container *container) {
+    double *distances = (double *) malloc((container->count * container->count) * sizeof(double));
+
+    /*
+     * Understanding we are repeating calculations that we don't need to,
+     * we start from left to right on each row.
+     *
+     * It is understood that this matrix could always contains zeros along the diagonal (no need to compute this)
+     * and that the values are mirrors across the diagonal.
+     */
+    for (int i = 0; i < container->count; i++) {
+        for (int j = 0; j < container->count; j++) {
+            distances[(j * container->count) + i] = sqrt(pow(container->points[i].x - container->points[j].x, 2) + pow(container->points[i].y - container->points[j].y, 2));
+            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
+        }
+    }
+
+    return distances;
+}
+
+/**
+ *
+ * MAIN
+ *
+ */
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         cout << "Usage: ./main tmp.txt\n" << endl;
@@ -80,4 +118,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < points->count; i++) {
         printf(" || I got: x -> %f, y -> %f\n", points->points[i].x, points->points[i].y);
     }
+
+    get_distance_matrix(points);
 }

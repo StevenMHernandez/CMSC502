@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.2)
 project(CMSC502Project1)
 
 # find header & source
-file(GLOB_RECURSE SOURCE "main.cpp")
+file(GLOB_RECURSE SOURCE "sequential.cpp")
 
 add_executable(${PROJECT_NAME}
         ${SOURCE}

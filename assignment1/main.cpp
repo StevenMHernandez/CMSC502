@@ -141,7 +141,7 @@ void combinations(int *arr, int size, int distances_count, int *index, int bit_p
 }
 
 int *get_subsets_of_size(int size, int distances_count) {
-    int *subsets = (int *) malloc(count_of_subsets_of_size(size, distances_count) * sizeof(int *));
+    int *subsets = (int *) calloc(count_of_subsets_of_size(size, distances_count), sizeof(int *));
     int index = 0;
     combinations(subsets, size, distances_count, &index, 0, 0, 0);
     return subsets;
@@ -154,9 +154,6 @@ double traveling_salesman(double *distances, int count) {
 
     for (int i = 0; i < (1 << count); i++) {
         c[i] = (double *) calloc(count, sizeof(double));
-//        for (int j = 0; j < count; j++) {
-//            c[i][j] = INF;
-//        }
     }
 
     // C({1},1) = 0
@@ -165,56 +162,40 @@ double traveling_salesman(double *distances, int count) {
     for (int s = 2; s <= count; s++) {
         // for all subsets S ⊆ {1,2,...,n} of size s and containing 1:
         int *subsets = get_subsets_of_size(s, count);
-        for (int s_i = 0; s_i < count_of_subsets_of_size(s, count); s_i++) {
+        for (uint s_i = 0; s_i < count_of_subsets_of_size(s, count); s_i++) {
             if ((subsets[s_i] & 1) != 0) { // containing 1
 
                 // C(S,1) = ∞
                 c[subsets[s_i]][1] = INF;
                 // for all j∈S, j≠1:
                 for (int j = 2; j <= count; j++) {
-//std::cout << std::bitset<16>(static_cast<unsigned long long int>(subsets[s_i])) << std::endl;
                     if (subsets[s_i] & (1 << (j - 1))) { // check if j∈S
                         // C(S, j) = min{C(S−{j},i)+dij: i∈S, i≠j}
                         double min = INF;
-                        double min_a = INF;
-                        double min_b = INF;
-                        string d_a = "d(x,x)";
-                        int d_b_1 = 0;
-                        int d_b_2 = 0;
                         for (int i = 1; i <= count; i++) {
                             int bitmask = 1 << (i-1);
                             if ((bitmask & subsets[s_i]) != 0 && i != j) { // only if i∈S and i≠j
-//                                printf("%i and %i\n", j, i);
-
                                 if (s != 2) {
                                     // pass
                                 }
-                                if (s == 2 || ~bitmask & subsets[s_i] & 1) { // not sure even
-//                                    double distance = distances[((j - 1) * count) + (i - 1)] + c[subsets[s_i]][i];
+                                if (s == 2 || ~bitmask & subsets[s_i] & 1) { // do not check bit 1
                                     double distance = distances[((j - 1) * count) + (i - 1)] + c[~bitmask & subsets[s_i]][j];
                                     if (min > distance) {
                                         min = distance;
-                                        min_a = distances[((j - 1) * count) + (i - 1)];
-                                        min_b = c[~bitmask & subsets[s_i]][j];
-                                        d_a[2] = '0' + j;
-                                        d_a[4] = '0' + i;
-                                        d_b_1 = j;
-//                                        d_b_2 = subsets[s_i];
-                                        d_b_2 = ~bitmask & subsets[s_i];
                                     }
                                 }
                             }
                         }
                         c[subsets[s_i]][j] = min;
 
-                        std::cout << "\n    stored at c[" << std::bitset<4>(static_cast<unsigned long long int>((subsets[s_i])))
+                        std::cout << "\n    stored at c[" << std::bitset<16>(static_cast<unsigned long long int>((subsets[s_i])))
                         << "][" << j << "]" << std::endl;
 
-                        std::cout << "C(" << j << ",{"
-                                << std::bitset<4>(static_cast<unsigned long long int>((subsets[s_i] & ~(1 << (j-1)) & ~1)))
-                                << "}) = " << d_a << " + " << "C(" << d_b_1 << ",{"
-                                << std::bitset<4>(static_cast<unsigned long long int>(d_b_2))
-                                << "}) = " << min_a << " + " << min_b << " = " << min << std::endl;
+//                        std::cout << "C(" << j << ",{"
+//                                << std::bitset<4>(static_cast<unsigned long long int>((subsets[s_i] & ~(1 << (j-1)) & ~1)))
+//                                << "}) = " << d_a << " + " << "C(" << d_b_1 << ",{"
+//                                << std::bitset<4>(static_cast<unsigned long long int>(d_b_2))
+//                                << "}) = " << min_a << " + " << min_b << " = " << min << std::endl;
 
 //                        std::cout << std::bitset<16>(static_cast<unsigned long long int>(subsets[s_i]))
 //                                << " " << j << ": " << min << std::endl;
@@ -255,14 +236,11 @@ double traveling_salesman(double *distances, int count) {
  *
  */
 int main(int argc, char *argv[]) {
-    // TODO: re-add
-//    if (argc != 2) {
-//        cout << "Usage: ./main tmp.txt\n" << endl;
-//        exit(0);
-//    }
-//    char *filename = argv[1];
-
-    char *filename = const_cast<char *>("../tmp.txt");
+    if (argc != 2) {
+        cout << "Usage: ./main tmp.txt\n" << endl;
+        exit(0);
+    }
+    char *filename = argv[1];
 
     printf("%s\n", argv[1]);
 
@@ -273,67 +251,8 @@ int main(int argc, char *argv[]) {
         printf(" || I got: x -> %f, y -> %f\n", points->points[i].x, points->points[i].y);
     }
 
-//    double *distances = get_distance_matrix(points);
-//    double min = traveling_salesman(distances, points->count);
+    double *distances = get_distance_matrix(points);
+    double min = traveling_salesman(distances, points->count);
 
-    double *distances = (double *) malloc(16 * sizeof(double));
-
-//    distances[0] = 0;
-//    distances[1] = 10;
-//    distances[2] = 15;
-//    distances[3] = 20;
-//
-//    distances[4] = 10;
-//    distances[5] = 0;
-//    distances[6] = 35;
-//    distances[7] = 25;
-//
-//    distances[8] = 15;
-//    distances[9] = 35;
-//    distances[10] = 0;
-//    distances[11] = 30;
-//
-//    distances[12] = 20;
-//    distances[13] = 25;
-//    distances[14] = 30;
-//    distances[15] = 0;
-
-//    answer 7
-    distances[0] = 0;
-    distances[1] = 4;
-    distances[2] = 1;
-    distances[3] = 3;
-
-    distances[4] = 4;
-    distances[5] = 0;
-    distances[6] = 2;
-    distances[7] = 1;
-
-    distances[8] = 1;
-    distances[9] = 2;
-    distances[10] = 0;
-    distances[11] = 5;
-
-    distances[12] = 3;
-    distances[13] = 1;
-    distances[14] = 5;
-    distances[15] = 0;
-
-
-
-    double min = traveling_salesman(distances, 4);
-
-//    printf("Hey, at least we got something. TSP-min is: %lf while the answer here should be 80 . . .", min);
-    printf("Hey, at least we got something. TSP-min is: %lf while the answer here should be 7 . . .", min);
-
-//    int s = 2;
-//    int count = 5;
-//
-//    int *subsets = get_subsets_of_size(s, count);
-//
-//    printf("%i\n", count_of_subsets_of_size(s, count));
-//
-//    for (int s_i = 0; s_i < count_of_subsets_of_size(s, count); s_i++) {
-//        std::cout << std::bitset<16>(static_cast<unsigned long long int>(subsets[s_i])) << std::endl;
-//    }
+    printf("TSP-min is: %lf", min);
 }

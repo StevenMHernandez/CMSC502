@@ -29,6 +29,14 @@ struct points_container {
 
 /**
  *
+ * GLOBAL VAR
+ *
+ */
+points_container **point_containers;
+double *results;
+
+/**
+ *
  * Load data from file
  *
  */
@@ -151,11 +159,10 @@ int *get_subsets_of_size(int size, int distances_count) {
 
 double traveling_salesman(double *distances, int count) {
     // bugfix -> handle when count == 1
-    if (count == 1) { return 0; }
+    if (count == 0 || count == 1) { return 0; }
     // bugfix -> handle when count == 2
     if (count == 2) { return 2 * distances[1]; }
 
-    printf("Making %d * sizeof(double)\n", (1 << count) * count);
     double **c = (double **) malloc((1 << count) * sizeof(double *));
 
     for (int i = 0; i < (1 << count); i++) {
@@ -237,6 +244,17 @@ double traveling_salesman(double *distances, int count) {
     return min;
 }
 
+void *run(void* ptr) {
+    int thread_identifier = *(int *) ptr;
+    double min = 0;
+    double *distances = get_distance_matrix(point_containers[thread_identifier]);
+    min = traveling_salesman(distances, point_containers[thread_identifier]->count);
+
+    printf("TSP-min is: %lf\n", min);
+
+    results[thread_identifier] = min;
+}
+
 /**
  *
  * MAIN
@@ -254,7 +272,7 @@ int main(int argc, char *argv[]) {
     int NUM_THREADS = 16;
 
     // create the point containers that will be used per thread.
-    points_container **point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
+    point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
 
 
     points_container *points = get_the_points(filename);
@@ -318,14 +336,25 @@ int main(int argc, char *argv[]) {
 //    }
 
     // TODO: create threads
-    for (int j = 0; j < NUM_THREADS; j++) {
-        double min = 0;
-        if (point_containers[j]->count > 1) {
-            double *distances = get_distance_matrix(point_containers[j]);
-            min = traveling_salesman(distances, point_containers[j]->count);
-        }
 
-        printf("TSP-min is: %lf\n", min);
-        printf(". . . ");
+
+    // create the threads
+    pthread_t* threads = (pthread_t*)malloc(NUM_THREADS * sizeof(pthread_t));
+    int* thread_identifier = (int*)malloc(NUM_THREADS * sizeof(int));
+    results = (double *) malloc(NUM_THREADS * sizeof(double));
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        thread_identifier[i] = i;
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_create(&threads[i], NULL, &run, (void*) &thread_identifier[i]);
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        void * result = 0;
+        pthread_join(threads[i], NULL);
+
+        printf("returned to main thread: %lf\n", results[i]);
     }
 }

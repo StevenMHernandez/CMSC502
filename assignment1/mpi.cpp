@@ -90,7 +90,7 @@ double *get_distance_matrix(points_container *container) {
         for (int j = 0; j < container->count; j++) {
             distances[(j * container->count) + i] = sqrt(pow(container->points[i].x - container->points[j].x, 2) +
                                                          pow(container->points[i].y - container->points[j].y, 2));
-            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
+//            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
         }
     }
 
@@ -188,8 +188,8 @@ double traveling_salesman(double *distances, int count) {
                         }
                         c[subsets[s_i]][j] = min;
 
-                        std::cout << "\n    stored at c[" << std::bitset<16>(static_cast<unsigned long long int>((subsets[s_i])))
-                        << "][" << j << "]" << std::endl;
+//                        std::cout << "\n    stored at c[" << std::bitset<16>(static_cast<unsigned long long int>((subsets[s_i])))
+//                        << "][" << j << "]" << std::endl;
 
 //                        std::cout << "C(" << j << ",{"
 //                                << std::bitset<4>(static_cast<unsigned long long int>((subsets[s_i] & ~(1 << (j-1)) & ~1)))
@@ -237,7 +237,7 @@ double traveling_salesman(double *distances, int count) {
  */
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        cout << "MPI-Usage: ./main tmp.txt\n" << endl;
+        cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
         exit(0);
     }
     char *filename = argv[1];
@@ -246,10 +246,6 @@ int main(int argc, char *argv[]) {
 
 
     points_container *points = get_the_points(filename);
-
-    for (int i = 0; i < points->count; i++) {
-        printf(" || I got: x -> %f, y -> %f\n", points->points[i].x, points->points[i].y);
-    }
 
     double *distances = get_distance_matrix(points);
     double min = traveling_salesman(distances, points->count);

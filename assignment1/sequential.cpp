@@ -90,7 +90,7 @@ double *get_distance_matrix(points_container *container) {
         for (int j = 0; j < container->count; j++) {
             distances[(j * container->count) + i] = sqrt(pow(container->points[i].x - container->points[j].x, 2) +
                                                          pow(container->points[i].y - container->points[j].y, 2));
-            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
+//            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
         }
     }
 
@@ -149,6 +149,11 @@ int *get_subsets_of_size(int size, int distances_count) {
 
 
 double traveling_salesman(double *distances, int count) {
+    // bugfix -> handle when count == 1
+    if (count == 1) { return 0; }
+    // bugfix -> handle when count == 2
+    if (count == 2) { return 2 * distances[1]; }
+
     printf("Making %d * sizeof(double)\n", (1 << count) * count);
     double **c = (double **) malloc((1 << count) * sizeof(double *));
 
@@ -237,7 +242,7 @@ double traveling_salesman(double *distances, int count) {
  */
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        cout << "Sequential-Usage: ./main tmp.txt\n" << endl;
+        cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
         exit(0);
     }
     char *filename = argv[1];
@@ -246,10 +251,6 @@ int main(int argc, char *argv[]) {
 
 
     points_container *points = get_the_points(filename);
-
-    for (int i = 0; i < points->count; i++) {
-        printf(" || I got: x -> %f, y -> %f\n", points->points[i].x, points->points[i].y);
-    }
 
     double *distances = get_distance_matrix(points);
     double min = traveling_salesman(distances, points->count);

@@ -1,5 +1,5 @@
-main: main.cpp
-	g++ -pthread -o main main.cpp
+sequential: sequential.cpp
+	g++ -pthread -o sequential sequential.cpp
 
 clean:
-	rm main
+	rm sequential

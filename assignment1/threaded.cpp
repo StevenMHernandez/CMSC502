@@ -237,7 +237,7 @@ double traveling_salesman(double *distances, int count) {
  */
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        cout << "Sequential-Usage: ./main tmp.txt\n" << endl;
+        cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
         exit(0);
     }
     char *filename = argv[1];

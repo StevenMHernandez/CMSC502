@@ -418,6 +418,10 @@ int *get_p_to_search(int p_index, points_container *container, int *final_path) 
     return result;
 }
 
+bool are_these_points_the_same(point a, point b) {
+    return a.x == b.x && a.y == b.y;
+}
+
 bool degreeAllowed(int g_i, int count) {
     int degree = grid_degrees[g_i];
 
@@ -563,6 +567,11 @@ int main(int argc, char *argv[]) {
 
     grid_degrees = (int *) calloc(NUM_THREADS, sizeof(int));
 
+    points_container *full_path = (points_container *) malloc(sizeof(points_container));
+    full_path->points = (point *) malloc(points->count * sizeof(point));
+    full_path->count = points->count;
+    int full_path_index = 0;
+
     /// First, mark all "already completed" grids as completed
     for (int g_i = 0; g_i < NUM_THREADS; g_i++) {
         points_container *g = point_containers[g_i];
@@ -588,15 +597,19 @@ int main(int argc, char *argv[]) {
                 /// Get Nearest neighbor
                 int nn_grid_index = -1;
                 int nn_p;
+                int previous_nn_p;
                 double nn_d = INF;
                 // for all g' \in G, g' != g and degreeAllowed(g')
                 for (int g1_i = 0; g1_i < NUM_THREADS; g1_i++) {
                     if (g1_i != g_i && degreeAllowed(g1_i, NUM_THREADS)) {
                         // for all p' \in g'
                         for (int p1_i = 1; p1_i <= point_containers[g1_i]->count; p1_i++) {
+//                            if (degree(g1_i) != 1 || find_neighbor_for_first_element_in_final_array) { // this occurs when we finish this loop.
+//
+//                            } else {
                             // d = distance(p, p')
-                            double d = distance(&point_containers[g_i]->points[p_to_search[p_i]-1],
-                                                &point_containers[g1_i]->points[p1_i-1]);
+                            double d = distance(&point_containers[g_i]->points[p_to_search[p_i] - 1],
+                                                &point_containers[g1_i]->points[p1_i - 1]);
                             // if d < nn_d
                             if (d < nn_d) {
                                 // nn_grid_index = g'-index
@@ -606,30 +619,61 @@ int main(int argc, char *argv[]) {
                                 nn_p = p1_i;
                                 nn_d = d;
                             }
+//                            }
                         }
                     }
                 }
 
                 /// We've got the Nearest neighbor
 //                printf("we got a nearest neighbor \n");
-                point *a = &point_containers[g_i]->points[p_to_search[p_i]-1];
-                point *b = &point_containers[nn_grid_index]->points[nn_p-1];
-                printf("connector.put(%i, [%lf %lf;%lf %lf]);\n", NUM_THREADS - degreesLeft(NUM_THREADS), a->x, a->y, b->x, b->y);
+                point *a = &point_containers[g_i]->points[p_to_search[p_i] - 1];
+                point *b = &point_containers[nn_grid_index]->points[nn_p - 1];
+                printf("connector.put(%i, [%lf %lf;%lf %lf]);\n", NUM_THREADS - degreesLeft(NUM_THREADS), a->x, a->y,
+                       b->x, b->y);
 
-                // updateDegree(g)
-//                updateDegree(g_i);
-                // updateDegree(g')
+                // if best_selected_point
 
-//                printf("%i -> %i\n", g_i, nn_grid_index);
+                for (int i = 0; i < point_containers[g_i]->count; i++) {
+                    printf("%i -> ", final_paths[g_i][i]);
+                }
+
+                point *point_we_are_about_to_add = &point_containers[g_i]->points[p_to_search[p_i] - 1];
+
+                if (full_path_index != 0) { // don't add the previous graph if we haven't added anything as of yet
+                    // push the values for the grid we are leaving behind
+                    if (point_containers[g_i]->count > 1) {
+//                        printf("{%i} {%i}", p_to_search[1], p_to_search[0]);
+
+//                        int index_of_previous = find_index_in_path_for_point(previous_nn_p, point_containers[g_i], final_paths[g_i]);
+                        int index_of_initial = find_index_in_path_for_point(previous_nn_p, point_containers[g_i], final_paths[g_i]);
+
+                        // if best neighbor was previous neighbor
+                        int value_modifier = p_to_search[p_i] == final_paths[g_i][index_of_initial - 1] ? 1 : -1;
+
+                        point *last_point_added;
+                        int city_identifier_for_last_placed = previous_nn_p;
+
+                        int count_for_this_grid = point_containers[g_i]->count;
+                        for (int i = 1; i < count_for_this_grid; i++) {
+                            int calculated_path_index = (((i * value_modifier) + index_of_initial + count_for_this_grid) % count_for_this_grid);
+                            int calculated_point_index = final_paths[g_i][calculated_path_index];
+                            full_path->points[full_path_index++] = point_containers[g_i]->points[calculated_point_index - 1];
+                        }
+                    }
+                }
+
+                full_path->points[full_path_index++] = *point_we_are_about_to_add;
+                full_path->points[full_path_index++] = point_containers[nn_grid_index]->points[nn_p - 1];
+
                 updateDegree(nn_grid_index);
-                // update_full_path() // TODO
-                // if degreesAllEqual2() // we are done!
+
                 if (degreesAllEqual2(NUM_THREADS)) {
                     // break
                     done = true;
                     break;
                 }
 
+                previous_nn_p = nn_p;
                 g_i = nn_grid_index;
 
                 // count_p_to_search = get_count_p_to_search(G[nn_grid_index])
@@ -641,87 +685,17 @@ int main(int argc, char *argv[]) {
     }
 
 
+    printf("connected_connectors = [");
+    for (int k = 0; k < full_path_index; k++) {
+        printf("%lf %lf;", full_path->points[k].x, full_path->points[k].y);
+    }
+    printf("]\n");
 
 
 
-
-
-
-
-
-
-    // Brute force~ish method. Takes O(n^2) space maybe
-    // for each block
-    // distances = [];
-    // paths_taken = [][];
-    // for each point (in parallel!)
-    // blocks_traveled = [];
-    // current_point = current_point
-    // mark current_point-block as completed
-    // while there are blocks to travel to:
-
-    // Find nearest neighbor:
-    // nearest_neighbor_distance = INF;
-    // nearest_neighbor_block = -1;
-    // nearest_neighbor_index? = -1; // this would have to be the index of the object within this specific block dataobject
-    // for each block
-    // if block has not been travelled to yet
-    // for each point in block
-    // distance = distance_between(current_point, point)
-    // if distance < nearest_neighbor_distance
-    // nearest_neighbor_distance = distance
-    // nearest_neighbor_block = block-id
-    // nearest_neighbor_index = point-id
-    // current_point = nearest_neighbor_point
-    // mark nearest_neighbor_block as completed
-    // min_distance
-    // min_index
-    // for i=>d in distances
-    // if d < min_distance
-    // min_distance = d;
-    // min_index = i
-
-    // Now that we have the nearest neighbors for these grids, we need to figure out which
-    // for each block
-    // next_block = get next block
-    // previous_block = get previous block
-    // prev_element = get_previous_element for this block
-    // next_element = get_next_element for this block
-    // for each [next_block, previous_block]
-    // if block.connectorA == block.connectorB // then this grid has not been worked on yet.
-    //
-
-
-    // Now that we have the nearest path, figure out if there are any overlapsIntersections which we can fix.
-
-//    // old TODO: remove
-//    // for each block
-//    for (int i = 0; i < NUM_THREADS; i++) {
-//        points_container *current_block = point_containers[i];
-//        // determine column_i
-//        int column_i = i % 3;
-//        // determine row_i
-//        int row_i = (int) floor(i / 3);
-//
-//        // determine column range
-//        int column_min = column_i == 0 ? 0 : -1;
-//        int column_max = column_i == 2 ? 0 : 1;
-//
-//        // determine row range
-//        int row_min = row_i == 0 ? 0 : -1;
-//        int row_max = row_i == 2 ? 0 : 1;
-//
-//        // for each columned neighbor
-//        for (int c = column_min; c <= column_max; c++) {
-//            // for each rowed neighbor
-//            for (int r = row_max; r <= row_max; r++) {
-//                points_container *neighbor = point_containers[r * (int) sqrt(NUM_THREADS) + c];
-//
-//                // Find nearest neighbor _point_
-//                // find distance
-//            }
-//        }
-//    }
+    /**
+     * Put it all together into one long path
+     */
 
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);

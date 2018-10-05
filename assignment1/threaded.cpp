@@ -33,6 +33,7 @@ struct points_container {
  *
  */
 points_container **point_containers;
+int **final_paths;
 double *results;
 
 /**
@@ -114,18 +115,17 @@ double *get_distance_matrix(points_container *container) {
 
 #define INF DBL_MAX;
 
-int factorial(int n) {
-    int total = 1;
-
-    for (int i = n; i > 0; i--) {
-        total *= i;
+int combinations_calculation(int n, int k) {
+    int result = n;
+    for (int i = 2; i <= k; ++i) {
+        result *= (n - i + 1);
+        result /= i;
     }
-
-    return total;
+    return result;
 }
 
 int count_of_subsets_of_size(int size, int distances_count) {
-    return factorial(distances_count) / (factorial(size) * factorial(distances_count - size));
+    return combinations_calculation(distances_count, size);
 }
 
 void combinations(int *arr, int size, int distances_count, int *index, int bit_position, int num_bits_set, int data) {
@@ -157,16 +157,35 @@ int *get_subsets_of_size(int size, int distances_count) {
 }
 
 
-double traveling_salesman(double *distances, int count) {
+
+/*
+ * One of the hardest parts of this is the difference between 0-based physical
+ * and 1-based logical city indexing.
+ *
+ * This function gets the array-index from distances[][] as _logical 1-based numbering_
+ */
+int get_combined_x_y_from_logical(int x, int y, int width) {
+    return (y - 1) * width + (x - 1);
+}
+
+/*
+ * This function gets the array-index from distances[][] as _physical 0-based numbering_
+ */
+int get_combined_x_y_from_physical(int x, int y, int width) {
+    return y * width + x;
+}
+
+double traveling_salesman(double *distances, int count, int *final_path) {
     // bugfix -> handle when count == 1
     if (count == 0 || count == 1) { return 0; }
     // bugfix -> handle when count == 2
     if (count == 2) { return 2 * distances[1]; }
 
-    double **c = (double **) malloc((1 << count) * sizeof(double *));
+//    printf("Making %li * sizeof(double)\n", static_cast<long>((1 << count) * count));
+    double **c = (double **) malloc(static_cast<long>((1 << count)) * sizeof(double *));
 
     for (int i = 0; i < (1 << count); i++) {
-        c[i] = (double *) calloc(count, sizeof(double));
+        c[i] = (double *) calloc(count + 1, sizeof(double));
     }
 
     // C({1},1) = 0
@@ -181,38 +200,37 @@ double traveling_salesman(double *distances, int count) {
                 // C(S,1) = ∞
                 c[subsets[s_i]][1] = INF;
                 // for all j∈S, j≠1:
-                for (int j = 2; j <= count; j++) {
-                    if (subsets[s_i] & (1 << (j - 1))) { // check if j∈S
+                for (int j = 2; j <= count; j++) { // check if j≠1 too
+                    int j_bitmask = 1 << (j - 1);
+                    if (subsets[s_i] & j_bitmask && j != 1) { // check if j∈S
                         // C(S, j) = min{C(S−{j},i)+dij: i∈S, i≠j}
                         double min = INF;
-                        for (int i = 1; i <= count; i++) {
-                            int bitmask = 1 << (i - 1);
-                            if ((bitmask & subsets[s_i]) != 0 && i != j) { // only if i∈S and i≠j
-                                if (s != 2) {
-                                    // pass
-                                }
-                                if (s == 2 || ~bitmask & subsets[s_i] & 1) { // do not check bit 1
-                                    double distance =
-                                            distances[((j - 1) * count) + (i - 1)] + c[~bitmask & subsets[s_i]][j];
-                                    if (min > distance) {
-                                        min = distance;
-                                    }
+                        int min_i = 0;
+                        int min_j_bitmask = 0;
+
+                        for (int i = 1; i <= count; i++) { // for each C(S−{j},i)+dij
+                            int i_bitmask = 1 << (i - 1);
+                            if ((i_bitmask & subsets[s_i]) != 0 && i != j) { // only if i∈S and i≠j
+                                int array_position = get_combined_x_y_from_logical(i, j, count);
+                                double distance = c[subsets[s_i] & (~j_bitmask)][i] + distances[array_position];
+                                if (min > distance) {
+                                    min_j_bitmask = j_bitmask;
+                                    min_i = i;
+                                    min = distance;
                                 }
                             }
                         }
+
                         c[subsets[s_i]][j] = min;
 
-//                        std::cout << "\n    stored at c[" << std::bitset<16>(static_cast<unsigned long long int>((subsets[s_i])))
-//                        << "][" << j << "]" << std::endl;
-
-//                        std::cout << "C(" << j << ",{"
-//                                << std::bitset<4>(static_cast<unsigned long long int>((subsets[s_i] & ~(1 << (j-1)) & ~1)))
-//                                << "}) = " << d_a << " + " << "C(" << d_b_1 << ",{"
-//                                << std::bitset<4>(static_cast<unsigned long long int>(d_b_2))
-//                                << "}) = " << min_a << " + " << min_b << " = " << min << std::endl;
-
-//                        std::cout << std::bitset<16>(static_cast<unsigned long long int>(subsets[s_i]))
-//                                << " " << j << ": " << min << std::endl;
+//                        string previous_bitmask_string = std::bitset<12>(
+//                                static_cast<unsigned long long int>(subsets[s_i] & ~min_j_bitmask)).to_string();
+//                        string x = std::bitset<12>(static_cast<unsigned long long int>((subsets[s_i]))).to_string();
+//                        printf("\n\n    dl[%i][%i] + c[%s][%i]", j, min_i, previous_bitmask_string.c_str(), min_i);
+//                        printf("\n   %lf + %lf = %lf stored at c[%s][%i]",
+//                               distances[get_combined_x_y_from_logical(min_i, j, count)],
+//                               c[subsets[s_i] & ~min_j_bitmask][min_i],
+//                               min, x.c_str(), j);
                     }
                 }
             }
@@ -222,35 +240,93 @@ double traveling_salesman(double *distances, int count) {
 
     // return minjC({1,...,n},j)+dj1
     double min = INF;
+    int min_i = 0;
 
     uint full_bitmask = 0;
     for (int i = 0; i < count; i++) {
         full_bitmask = full_bitmask | (1 << i);
     }
 
-    for (int i = 1; i < count; i++) {
-        double distance = c[full_bitmask][i];
+    for (int i = 2; i <= count; i++) {
+        double distance = c[full_bitmask][i] + distances[get_combined_x_y_from_logical(1, i, count)];
 
         if (min > distance) {
             min = distance;
+            min_i = i;
         }
     }
 
-//    for (int i = 0; i < (1 << count); i++) {
-//        free(c[i]);
-//    }
-//    free(c);
+    /*
+     * Go backwards and determine the path
+     */
+//    int *final_path_cities = (int *) malloc((count + 1) * sizeof(int));
+
+    final_path[0] = 1;
+    // we know the next city because we calculated that just now:
+    final_path[1] = min_i;
+
+//    printf("\n hey at least we know [0] -> 0 and [1] -> %i", min_i);
+
+    // find each city travelled to
+    double current_sum =
+            min - distances[get_combined_x_y_from_logical(final_path[0], final_path[1], count)];
+    uint current_bitmask = full_bitmask;
+    // for each city-slot available
+    for (int i = 2; i <= count; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0] and final_path_cities[1]
+//        printf("\n\n\n");
+//    for (int i = 1; i < count + 1; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0]
+        // for each candidate city path taken
+        for (int j = 1; j <= count; j++) {
+            int x = final_path[i - 1]; // last city travelled to (used to figure out the distances to the current
+            int y = j;
+            if (x != y) {
+                uint tmp_bitmask = (uint) current_bitmask ^(uint) (1 << (x - 1));
+                string a_str = std::bitset<12>(static_cast<unsigned long long int>(tmp_bitmask)).to_string();
+                string sum_str = std::bitset<12>(static_cast<unsigned long long int>(current_bitmask)).to_string();
+
+                double calculated_prev = c[tmp_bitmask][j];
+                double calculated_distance = distances[get_combined_x_y_from_logical(x, y, count)];
+                double calculated_for_current_iteration = calculated_prev + calculated_distance;
+
+//                printf("\nc[%s][%i] + d[%i][%i] = c[%s][%i]\n", a_str.c_str(), j, x, y, sum_str.c_str(), j);
+//                printf("  %lf + %lf", calculated_prev, calculated_distance);
+//                printf(" = %lf", calculated_for_current_iteration);
+//                printf(" ==? %lf ???", current_sum);
+
+                bool is_this_it = abs(calculated_for_current_iteration - current_sum) < 0.000001;
+
+//                if (is_this_it) {
+//                    printf(" YES!!!  <---");
+//                }
+
+                if (is_this_it) {
+                    final_path[i] = j;
+//                int x = final_path_cities[i - 1];
+//                int y = final_path_cities[i];
+                    current_sum = current_sum - distances[get_combined_x_y_from_logical(x, y, count)];
+                    current_bitmask = tmp_bitmask;
+                    break;
+                }
+            }
+        }
+    }
 
     return min;
 }
 
 void *run(void* ptr) {
     int thread_identifier = *(int *) ptr;
+
+    int city_count = point_containers[thread_identifier]->count;
+
     double min = 0;
     double *distances = get_distance_matrix(point_containers[thread_identifier]);
-    min = traveling_salesman(distances, point_containers[thread_identifier]->count);
 
-    printf("TSP-min is: %lf\n", min);
+    int *final_path = (int *) malloc(city_count * sizeof(int));
+
+    min = traveling_salesman(distances, city_count, final_path);
+
+    final_paths[thread_identifier] = final_path;
 
     results[thread_identifier] = min;
 }
@@ -273,7 +349,7 @@ int main(int argc, char *argv[]) {
 
     // create the point containers that will be used per thread.
     point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
-
+    final_paths = (int **) malloc(NUM_THREADS * sizeof(int *));
 
     points_container *points = get_the_points(filename);
 
@@ -289,9 +365,9 @@ int main(int argc, char *argv[]) {
         max_y = max(max_x, ceil(points->points[i].y));
     }
     double range_x = max_x - min_x;
-    double block_range_x = ceil(range_x / sqrt(NUM_THREADS));
+    double block_range_x = ceil((range_x + 1) / sqrt(NUM_THREADS));
     double range_y = max_y - min_y;
-    double block_range_y = ceil(range_y / sqrt(NUM_THREADS));
+    double block_range_y = ceil((range_y + 1) / sqrt(NUM_THREADS));
 
     // TODO: count how many elements are stored in each grid block so that we can malloc it
     int *block_sizes = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
@@ -328,17 +404,7 @@ int main(int argc, char *argv[]) {
         block_pointer_indices[block_i]++;
     }
 
-//    // validate splits TODO: remove
-//    for (int j = 0; j < NUM_THREADS; j++) {
-//        for (int i = 0; i < point_containers[j]->count; i++) {
-//            printf("block %i has a point %lf,%lf (%i out of %i)\n", j, point_containers[j]->points[i].x, point_containers[j]->points[i].y, i, point_containers[j]->count);
-//        }
-//    }
-
-    // TODO: create threads
-
-
-    // create the threads
+    // create the threads to get the grid of tsp sub-solutions
     pthread_t* threads = (pthread_t*)malloc(NUM_THREADS * sizeof(pthread_t));
     int* thread_identifier = (int*)malloc(NUM_THREADS * sizeof(int));
     results = (double *) malloc(NUM_THREADS * sizeof(double));
@@ -356,5 +422,78 @@ int main(int argc, char *argv[]) {
         pthread_join(threads[i], NULL);
 
         printf("returned to main thread: %lf\n", results[i]);
+    }
+
+    // Brute force~ish method. Takes O(n^2) space maybe
+    // for each block
+        // distances = [];
+        // paths_taken = [][];
+        // for each point (in parallel!)
+            // blocks_traveled = [];
+            // current_point = current_point
+            // mark current_point-block as completed
+            // while there are blocks to travel to:
+
+                // Find nearest neighbor:
+                // nearest_neighbor_distance = INF;
+                // nearest_neighbor_block = -1;
+                // nearest_neighbor_index? = -1; // this would have to be the index of the object within this specific block dataobject
+                // for each block
+                    // if block has not been travelled to yet
+                        // for each point in block
+                            // distance = distance_between(current_point, point)
+                            // if distance < nearest_neighbor_distance
+                                // nearest_neighbor_distance = distance
+                                // nearest_neighbor_block = block-id
+                                // nearest_neighbor_index = point-id
+                // current_point = nearest_neighbor_point
+                // mark nearest_neighbor_block as completed
+        // min_distance
+        // min_index
+        // for i=>d in distances
+            // if d < min_distance
+                // min_distance = d;
+                // min_index = i
+
+    // Now that we have the nearest neighbors for these grids, we need to figure out which
+    // for each block
+        // next_block = get next block
+        // previous_block = get previous block
+        // prev_element = get_previous_element for this block
+        // next_element = get_next_element for this block
+        // for each [next_block, previous_block]
+            // if block.connectorA == block.connectorB // then this grid has not been worked on yet.
+                //
+
+
+    // Now that we have the nearest path, figure out if there are any overlapsIntersections which we can fix.
+
+    // old TODO: remove
+    // for each block
+    for (int i = 0; i < NUM_THREADS; i++) {
+        points_container *current_block = point_containers[i];
+        // determine column_i
+        int column_i = i % 3;
+        // determine row_i
+        int row_i = (int) floor(i / 3);
+
+        // determine column range
+        int column_min = column_i == 0 ? 0 : -1;
+        int column_max = column_i == 2 ? 0 : 1;
+
+        // determine row range
+        int row_min = row_i == 0 ? 0 : -1;
+        int row_max = row_i == 2 ? 0 : 1;
+
+        // for each columned neighbor
+        for (int c = column_min; c <= column_max; c++) {
+            // for each rowed neighbor
+            for (int r = row_max; r <= row_max; r++) {
+                points_container *neighbor = point_containers[r * (int) sqrt(NUM_THREADS) + c];
+
+                // Find nearest neighbor _point_
+                // find distance
+            }
+        }
     }
 }

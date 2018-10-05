@@ -105,9 +105,7 @@ double *get_distance_matrix(points_container *container) {
 
 #define INF DBL_MAX;
 
-int combinations(int n, int k) {
-//    if (k * 2 > n) return n - k;
-
+int combinations_calculation(int n, int k) {
     int result = n;
     for (int i = 2; i <= k; ++i) {
         result *= (n - i + 1);
@@ -117,7 +115,7 @@ int combinations(int n, int k) {
 }
 
 int count_of_subsets_of_size(int size, int distances_count) {
-    return combinations(distances_count, size);
+    return combinations_calculation(distances_count, size);
 }
 
 void combinations(int *arr, int size, int distances_count, int *index, int bit_position, int num_bits_set, int data) {
@@ -310,7 +308,7 @@ double traveling_salesman(double *distances, int count, int *final_path) {
  *
  */
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
+    if (argc < 2) {
         cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
         exit(0);
     }

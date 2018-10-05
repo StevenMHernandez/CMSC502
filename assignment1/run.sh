@@ -2,8 +2,11 @@ make clean
 
 make
 
-sh gen_cities.sh 12 > tmp.txt
 
-time ./main tmp.txt
+for ((i=10;i<=25;i++)); do
+    sh gen_cities.sh $i > tmp.txt
+    echo "run $i: \c"
+    ./sequential tmp.txt
+done
 
-# TODO: compare times and such on each type.
+echo "done"

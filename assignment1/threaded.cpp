@@ -177,9 +177,9 @@ int get_combined_x_y_from_physical(int x, int y, int width) {
 
 double traveling_salesman(double *distances, int count, int *final_path) {
     // bugfix -> handle when count == 1
-    if (count == 0 || count == 1) { return 0; }
+    if (count == 0 ) { return 0; }
     // bugfix -> handle when count == 2
-    if (count == 2) { return 2 * distances[1]; }
+//    if (count == 2) { return 2 * distances[1]; }
 
 //    printf("Making %li * sizeof(double)\n", static_cast<long>((1 << count) * count));
     double **c = (double **) malloc(static_cast<long>((1 << count)) * sizeof(double *));
@@ -322,11 +322,9 @@ void *run(void* ptr) {
     double min = 0;
     double *distances = get_distance_matrix(point_containers[thread_identifier]);
 
-    int *final_path = (int *) malloc(city_count * sizeof(int));
+    final_paths[thread_identifier] = (int *) malloc(city_count * sizeof(int));
 
-    min = traveling_salesman(distances, city_count, final_path);
-
-    final_paths[thread_identifier] = final_path;
+    min = traveling_salesman(distances, city_count, final_paths[thread_identifier]);
 
     results[thread_identifier] = min;
 }
@@ -343,7 +341,9 @@ int main(int argc, char *argv[]) {
     }
     char *filename = argv[1];
 
-    printf("%s\n", argv[1]);
+    struct timespec start, end;
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
 
     int NUM_THREADS = 16;
 
@@ -421,7 +421,19 @@ int main(int argc, char *argv[]) {
         void * result = 0;
         pthread_join(threads[i], NULL);
 
-        printf("returned to main thread: %lf\n", results[i]);
+//        printf("returned to main thread: %lf\n", results[i]);
+
+        int *final_path = final_paths[i];
+        points_container *p = point_containers[i];
+
+        /**
+         * Print the paths for display in matlab
+         */
+//        printf("\nseq_paths.put(%i, [", i);
+//        for (int j = 0; j < p->count; j++) {
+//            printf("%lf %lf;", p->points[final_path[j] - 1].x, p->points[final_path[j] - 1].y);
+//        }
+//        printf("]);");
     }
 
     // Brute force~ish method. Takes O(n^2) space maybe
@@ -496,4 +508,11 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+
+
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
+
+    printf("time (ms): %llu\n", diff);
 }

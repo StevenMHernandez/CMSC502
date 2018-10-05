@@ -330,12 +330,14 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
 
-//    for (int i = 0; i < points->count; i++) {
-//        if (i != 0) {
-//            printf(" -> ");
-//        }
-//        printf("%i", final_path[i]);
-//    }
+    /**
+     * Print the paths for display in matlab
+     */
+    printf("path = [");
+    for (int i = 0; i < points->count; i++) {
+        printf("%lf %lf;", points->points[final_path[i] - 1].x, points->points[final_path[i] - 1].y);
+    }
+    printf("]");
 
 //    printf("\n\nTSP-min is: %lf\n", min);
 

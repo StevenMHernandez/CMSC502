@@ -500,6 +500,58 @@ void add_sub_graph(points_container **full_path, int *full_path_index, int g_i, 
     }
 }
 
+int triangleOrientation(point a, point b, point c) {
+    double val = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
+
+    // colinear
+    if (val == 0) {
+        return 0;
+    }
+
+    // clock or counterclock wise
+    return val > 0 ? 1 : 2;
+}
+
+bool pointsIntersect(point a1, point a2, point b1, point b2) {
+    int o1 = triangleOrientation(a1, a2, b1);
+    int o2 = triangleOrientation(a1, a2, b2);
+    int o3 = triangleOrientation(b1, b2, a1);
+    int o4 = triangleOrientation(b1, b2, a2);
+
+    return o1 != o2 && o3 != o4;
+
+//     General case
+//    if (o1 != o2 && o3 != o4) {
+//        return true;
+//    }
+
+    return false;
+}
+
+void swap_points(points_container **full_path, int a, int b) {
+//    if (a == b) {
+//        printf("WOW They equal\n");
+//    }
+//    printf("swap %i <-> %i\n", a, b);
+    point tmp = (*full_path)->points[a];
+
+    (*full_path)->points[a] = (*full_path)->points[b];
+    (*full_path)->points[b] = tmp;
+}
+
+void handleInversion(points_container **full_path, int x1, int y0) {
+//    printf("handle inversion for %i %i\n", x1, y0);
+    if (x1 < y0) {
+        int range = x1 < y0 ? y0 - x1 : ((*full_path)->count) - x1 + y0;
+//    printf("range2: %i, %i\n", range - (2*floor(range/2)), range);
+
+        int path_length = ((*full_path)->count);
+
+        for (int i = 0; i <= ceil(range / 2); ++i) {
+            swap_points(full_path, (x1 + i) % path_length, (y0 - i + path_length) % path_length);
+        }
+    }
+}
 
 /**
  *
@@ -697,7 +749,8 @@ int main(int argc, char *argv[]) {
                 updateDegree(nn_grid_index);
 
                 if (degreesAllEqual2(NUM_THREADS)) {
-                    int candidate_city_identifier = get_city_identifier(full_path->points[0], point_containers[nn_grid_index]);
+                    int candidate_city_identifier = get_city_identifier(full_path->points[0],
+                                                                        point_containers[nn_grid_index]);
 //                    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, point_containers[nn_grid_index], final_path);
                     int *fake_p_to_search = (int *) malloc(sizeof(int));
                     fake_p_to_search[0] = candidate_city_identifier;
@@ -720,18 +773,35 @@ int main(int argc, char *argv[]) {
     }
 
 
-    printf("connected_connectors = [");
-    for (int k = 0; k < full_path_index; k++) {
+    // handle inversions
+    int point_count = full_path_index - 1;
+    full_path->count = point_count;
+    for (int i = 0; i < 100; i++) {
+//        printf("INVERSIONS?\n");
+        int intersection_count = 0;
+        for (int x0 = 0; x0 < point_count - 2; x0++) {
+            int x1 = x0 + 1;
+
+            for (int y_i = 0; y_i < point_count - 1 - 2; y_i++) {
+                int y0 = (y_i + x1 + 1) % full_path->count;
+                int y1 = (y0 + 1) % full_path->count;
+
+//            printf("max[%i] %i,%i  -> %i,%i\n", points->count, x0, x1, y0, y1);
+                if (pointsIntersect(full_path->points[x0], full_path->points[x1], full_path->points[y0],
+                                    full_path->points[y1])) {
+                    handleInversion(&full_path, x1, y0);
+                    intersection_count++;
+                }
+            }
+        }
+        printf(" # is %i\n=========\n", intersection_count);
+    }
+
+    printf("\nconnected_connectors = [");
+    for (int k = 0; k < full_path_index - 1; k++) {
         printf("%lf %lf;", full_path->points[k].x, full_path->points[k].y);
     }
     printf("]\n");
-
-
-
-    /**
-     * Put it all together into one long path
-     */
-
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;

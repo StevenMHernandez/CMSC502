@@ -456,6 +456,50 @@ bool degreesAllEqual2(int count) {
     return degreesLeft(count) == 0;
 }
 
+int get_city_identifier(point p, points_container *container) {
+    int city_identifier = -1;
+
+    for (int i = 0; i < container->count; i++) {
+        if (p.x == container->points[i].x && p.y == container->points[i].y) {
+            city_identifier = i + 1;
+        }
+    }
+
+    return city_identifier;
+}
+
+bool point_are_neighbors(point key_point, point candidate_point, points_container *container, int *path) {
+    int city_identifier = get_city_identifier(key_point, container);
+    int candidate_city_identifier = get_city_identifier(candidate_point, container);
+
+    int city_identifier_0 = prev_neighbor_point(city_identifier, container, path);
+    int city_identifier_1 = next_neighbor_point(city_identifier, container, path);
+
+    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, container, path);
+
+    return candidate_point_path_index == city_identifier_0 || candidate_point_path_index == city_identifier_1;
+}
+
+void add_sub_graph(points_container **full_path, int *full_path_index, int g_i, int previous_nn_p, int *p_to_search, int p_i) {
+    if (point_containers[g_i]->count > 1) {
+        // printf("{%i} {%i}", p_to_search[1], p_to_search[0]);
+        int index_of_initial = find_index_in_path_for_point(previous_nn_p, point_containers[g_i],
+                                                            final_paths[g_i]);
+
+        int value_modifier = p_to_search[p_i] == final_paths[g_i][index_of_initial - 1] ? 1 : -1;
+
+        int count_for_this_grid = point_containers[g_i]->count;
+        for (int i = 1; i < count_for_this_grid; i++) {
+            int calculated_path_index = (
+                    ((i * value_modifier) + index_of_initial + count_for_this_grid) %
+                    count_for_this_grid);
+            int calculated_point_index = final_paths[g_i][calculated_path_index];
+            (*full_path)->points[(*full_path_index)++] = point_containers[g_i]->points[
+                    calculated_point_index - 1];
+        }
+    }
+}
+
 
 /**
  *
@@ -603,23 +647,25 @@ int main(int argc, char *argv[]) {
                 for (int g1_i = 0; g1_i < NUM_THREADS; g1_i++) {
                     if (g1_i != g_i && degreeAllowed(g1_i, NUM_THREADS)) {
                         // for all p' \in g'
+                        printf("LISTED %i\n", grid_degrees[g1_i]);
                         for (int p1_i = 1; p1_i <= point_containers[g1_i]->count; p1_i++) {
-//                            if (degree(g1_i) != 1 || find_neighbor_for_first_element_in_final_array) { // this occurs when we finish this loop.
-//
-//                            } else {
-                            // d = distance(p, p')
-                            double d = distance(&point_containers[g_i]->points[p_to_search[p_i] - 1],
-                                                &point_containers[g1_i]->points[p1_i - 1]);
-                            // if d < nn_d
-                            if (d < nn_d) {
-                                // nn_grid_index = g'-index
-                                // nn_p = p'
-                                // nn_d = d
-                                nn_grid_index = g1_i;
-                                nn_p = p1_i;
-                                nn_d = d;
+                            if (grid_degrees[g1_i] == 0 || point_are_neighbors(full_path->points[0],
+                                                                               point_containers[g1_i]->points[p1_i - 1],
+                                                                               point_containers[g1_i],
+                                                                               final_paths[g1_i])) {
+                                // d = distance(p, p')
+                                double d = distance(&point_containers[g_i]->points[p_to_search[p_i] - 1],
+                                                    &point_containers[g1_i]->points[p1_i - 1]);
+                                // if d < nn_d
+                                if (d < nn_d) {
+                                    // nn_grid_index = g'-index
+                                    // nn_p = p'
+                                    // nn_d = d
+                                    nn_grid_index = g1_i;
+                                    nn_p = p1_i;
+                                    nn_d = d;
+                                }
                             }
-//                            }
                         }
                     }
                 }
@@ -641,25 +687,8 @@ int main(int argc, char *argv[]) {
 
                 if (full_path_index != 0) { // don't add the previous graph if we haven't added anything as of yet
                     // push the values for the grid we are leaving behind
-                    if (point_containers[g_i]->count > 1) {
-//                        printf("{%i} {%i}", p_to_search[1], p_to_search[0]);
-
-//                        int index_of_previous = find_index_in_path_for_point(previous_nn_p, point_containers[g_i], final_paths[g_i]);
-                        int index_of_initial = find_index_in_path_for_point(previous_nn_p, point_containers[g_i], final_paths[g_i]);
-
-                        // if best neighbor was previous neighbor
-                        int value_modifier = p_to_search[p_i] == final_paths[g_i][index_of_initial - 1] ? 1 : -1;
-
-                        point *last_point_added;
-                        int city_identifier_for_last_placed = previous_nn_p;
-
-                        int count_for_this_grid = point_containers[g_i]->count;
-                        for (int i = 1; i < count_for_this_grid; i++) {
-                            int calculated_path_index = (((i * value_modifier) + index_of_initial + count_for_this_grid) % count_for_this_grid);
-                            int calculated_point_index = final_paths[g_i][calculated_path_index];
-                            full_path->points[full_path_index++] = point_containers[g_i]->points[calculated_point_index - 1];
-                        }
-                    }
+                    // if best neighbor was previous neighbor
+                    add_sub_graph(&full_path, &full_path_index, g_i, previous_nn_p, p_to_search, p_i);
                 }
 
                 full_path->points[full_path_index++] = *point_we_are_about_to_add;
@@ -668,6 +697,12 @@ int main(int argc, char *argv[]) {
                 updateDegree(nn_grid_index);
 
                 if (degreesAllEqual2(NUM_THREADS)) {
+                    int candidate_city_identifier = get_city_identifier(full_path->points[0], point_containers[nn_grid_index]);
+//                    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, point_containers[nn_grid_index], final_path);
+                    int *fake_p_to_search = (int *) malloc(sizeof(int));
+                    fake_p_to_search[0] = candidate_city_identifier;
+                    add_sub_graph(&full_path, &full_path_index, nn_grid_index, nn_p, fake_p_to_search, 0);
+
                     // break
                     done = true;
                     break;

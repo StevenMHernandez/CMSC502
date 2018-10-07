@@ -794,7 +794,7 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        printf(" # is %i\n=========\n", intersection_count);
+//        printf(" # is %i\n=========\n", intersection_count);
     }
 
     printf("\nconnected_connectors = [");

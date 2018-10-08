@@ -558,78 +558,9 @@ void handleInversion(points_container **full_path, int x1, int y0) {
  *
  */
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
-        exit(0);
-    }
-    char *filename = argv[1];
-
-    struct timespec start, end;
-
-    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-
-    int NUM_THREADS = 16;
-
-    // create the point containers that will be used per thread.
-    point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
-    final_paths = (int **) malloc(NUM_THREADS * sizeof(int *));
-
-    points_container *points = get_the_points(filename);
-
-
-    double min_x = points->points[0].x;
-    double max_x = points->points[0].x;
-    double min_y = points->points[0].y;
-    double max_y = points->points[0].y;
-    for (int i = 0; i < points->count; i++) {
-        min_x = min(min_x, floor(points->points[i].x));
-        max_x = max(max_x, ceil(points->points[i].x));
-        min_y = min(min_x, floor(points->points[i].y));
-        max_y = max(max_x, ceil(points->points[i].y));
-    }
-    double range_x = max_x - min_x;
-    double block_range_x = ceil((range_x + 1) / sqrt(NUM_THREADS));
-    double range_y = max_y - min_y;
-    double block_range_y = ceil((range_y + 1) / sqrt(NUM_THREADS));
-
-    // TODO: count how many elements are stored in each grid block so that we can malloc it
-    int *block_sizes = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
-
-    // count how many points each block should have
-    for (int i = 0; i < points->count; i++) {
-        point p = points->points[i];
-        int x_block = (int) floor((p.x - min_x) / block_range_x);
-        int y_block = (int) floor((p.y - min_y) / block_range_y);
-
-        block_sizes[(x_block * (int) sqrt(NUM_THREADS)) + y_block]++;
-    }
-
-    // initialize data structure for each grid block
-    for (int j = 0; j < NUM_THREADS; j++) {
-        point_containers[j] = (points_container *) malloc(sizeof(points_container));
-        point_containers[j]->points = (point *) malloc(block_sizes[j] * sizeof(point));
-        point_containers[j]->count = block_sizes[j];
-    }
-
-    // populate each grid block
-    int *block_pointer_indices = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
-    for (int i = 0; i < points->count; i++) {
-        point p = points->points[i];
-        int x_block = (int) floor((p.x - min_x) / block_range_x);
-        int y_block = (int) floor((p.y - min_y) / block_range_y);
-
-        int block_i = (x_block * (int) sqrt(NUM_THREADS)) + y_block;
-
-        int index = block_pointer_indices[block_i];
-
-        memcpy(&point_containers[block_i]->points[index], &p, sizeof(point));
-
-        block_pointer_indices[block_i]++;
-    }
-
     /**
      *
-     * MPI Specific Code
+     * MPI Code
      *
      */
 
@@ -638,7 +569,93 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &total_tasks); // This will need to be a power of 2 right now.
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    run(rank);
+
+    if (rank == 0) {
+        // load data, then broadcast to other nodes it is ready
+
+        if (argc != 2) {
+            cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
+            exit(0);
+        }
+        char *filename = argv[1];
+
+        struct timespec start, end;
+
+        clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+
+        int NUM_THREADS = 16;
+
+        // create the point containers that will be used per thread.
+        point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
+        final_paths = (int **) malloc(NUM_THREADS * sizeof(int *));
+
+        points_container *points = get_the_points(filename);
+
+
+        double min_x = points->points[0].x;
+        double max_x = points->points[0].x;
+        double min_y = points->points[0].y;
+        double max_y = points->points[0].y;
+        for (int i = 0; i < points->count; i++) {
+            min_x = min(min_x, floor(points->points[i].x));
+            max_x = max(max_x, ceil(points->points[i].x));
+            min_y = min(min_x, floor(points->points[i].y));
+            max_y = max(max_x, ceil(points->points[i].y));
+        }
+        double range_x = max_x - min_x;
+        double block_range_x = ceil((range_x + 1) / sqrt(NUM_THREADS));
+        double range_y = max_y - min_y;
+        double block_range_y = ceil((range_y + 1) / sqrt(NUM_THREADS));
+
+        // TODO: count how many elements are stored in each grid block so that we can malloc it
+        int *block_sizes = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
+
+        // count how many points each block should have
+        for (int i = 0; i < points->count; i++) {
+            point p = points->points[i];
+            int x_block = (int) floor((p.x - min_x) / block_range_x);
+            int y_block = (int) floor((p.y - min_y) / block_range_y);
+
+            block_sizes[(x_block * (int) sqrt(NUM_THREADS)) + y_block]++;
+        }
+
+        // initialize data structure for each grid block
+        for (int j = 0; j < NUM_THREADS; j++) {
+            point_containers[j] = (points_container *) malloc(sizeof(points_container));
+            point_containers[j]->points = (point *) malloc(block_sizes[j] * sizeof(point));
+            point_containers[j]->count = block_sizes[j];
+        }
+
+        // populate each grid block
+        int *block_pointer_indices = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
+        for (int i = 0; i < points->count; i++) {
+            point p = points->points[i];
+            int x_block = (int) floor((p.x - min_x) / block_range_x);
+            int y_block = (int) floor((p.y - min_y) / block_range_y);
+
+            int block_i = (x_block * (int) sqrt(NUM_THREADS)) + y_block;
+
+            int index = block_pointer_indices[block_i];
+
+            memcpy(&point_containers[block_i]->points[index], &p, sizeof(point));
+
+            block_pointer_indices[block_i]++;
+        }
+    }
+
+    int *example = (int *) malloc(sizeof(int));
+    *example = 9;
+    MPI_Bcast(example,1, MPI_INT, 0, MPI_COMM_WORLD);
+
+//    run(rank);
+
+    printf("I am rank %i, I DID get %i (stored at %p) and I can see %i points (stored at %p)!", rank, *example, example,  point_containers[rank]->count, point_containers[rank]);
+
+    if (rank == 0) {
+
+    } else {
+        // wait for data to be loaded from master
+    }
 
     MPI_Finalize();
 

@@ -649,14 +649,14 @@ int main(int argc, char *argv[]) {
         int *final_path = final_paths[i];
         points_container *p = point_containers[i];
 
-        /**
-         * Print the paths for display in matlab
-         */
-        printf("\nseq_paths.put(%i, [", i);
-        for (int j = 0; j < p->count; j++) {
-            printf("%lf %lf;", p->points[final_path[j] - 1].x, p->points[final_path[j] - 1].y);
-        }
-        printf("]);");
+//        /**
+//         * Print the paths for display in matlab
+//         */
+//        printf("\nseq_paths.put(%i, [", i);
+//        for (int j = 0; j < p->count; j++) {
+//            printf("%lf %lf;", p->points[final_path[j] - 1].x, p->points[final_path[j] - 1].y);
+//        }
+//        printf("]);");
     }
 
 
@@ -670,7 +670,6 @@ int main(int argc, char *argv[]) {
     /// First, mark all "already completed" grids as completed
     for (int g_i = 0; g_i < NUM_THREADS; g_i++) {
         points_container *g = point_containers[g_i];
-        printf("\ngrids got %i\n", g->count);
         if (g->count == 0) {
             grid_degrees[g_i] = 2;
         }
@@ -698,7 +697,6 @@ int main(int argc, char *argv[]) {
                 for (int g1_i = 0; g1_i < NUM_THREADS; g1_i++) {
                     if (g1_i != g_i && degreeAllowed(g1_i, NUM_THREADS)) {
                         // for all p' \in g'
-                        printf("LISTED %i\n", grid_degrees[g1_i]);
                         for (int p1_i = 1; p1_i <= point_containers[g1_i]->count; p1_i++) {
                             if (grid_degrees[g1_i] == 0 || point_are_neighbors(full_path->points[0],
                                                                                point_containers[g1_i]->points[p1_i - 1],
@@ -722,17 +720,8 @@ int main(int argc, char *argv[]) {
                 }
 
                 /// We've got the Nearest neighbor
-//                printf("we got a nearest neighbor \n");
                 point *a = &point_containers[g_i]->points[p_to_search[p_i] - 1];
                 point *b = &point_containers[nn_grid_index]->points[nn_p - 1];
-                printf("connector.put(%i, [%lf %lf;%lf %lf]);\n", NUM_THREADS - degreesLeft(NUM_THREADS), a->x, a->y,
-                       b->x, b->y);
-
-                // if best_selected_point
-
-                for (int i = 0; i < point_containers[g_i]->count; i++) {
-                    printf("%i -> ", final_paths[g_i][i]);
-                }
 
                 point *point_we_are_about_to_add = &point_containers[g_i]->points[p_to_search[p_i] - 1];
 
@@ -785,7 +774,6 @@ int main(int argc, char *argv[]) {
                 int y0 = (y_i + x1 + 1) % full_path->count;
                 int y1 = (y0 + 1) % full_path->count;
 
-//            printf("max[%i] %i,%i  -> %i,%i\n", points->count, x0, x1, y0, y1);
                 if (pointsIntersect(full_path->points[x0], full_path->points[x1], full_path->points[y0],
                                     full_path->points[y1])) {
                     handleInversion(&full_path, x1, y0);
@@ -793,14 +781,13 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-//        printf(" # is %i\n=========\n", intersection_count);
     }
 
-    printf("\nconnected_connectors = [");
-    for (int k = 0; k < full_path_index - 1; k++) {
-        printf("%lf %lf;", full_path->points[k].x, full_path->points[k].y);
-    }
-    printf("]\n");
+//    printf("\nconnected_connectors = [");
+//    for (int k = 0; k < full_path_index - 1; k++) {
+//        printf("%lf %lf;", full_path->points[k].x, full_path->points[k].y);
+//    }
+//    printf("]\n");
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;

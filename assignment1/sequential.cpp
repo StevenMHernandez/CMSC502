@@ -269,9 +269,9 @@ double traveling_salesman(double *distances, int count, int *final_path) {
             int y = j;
             if (x != y) {
                 uint tmp_bitmask = (uint) current_bitmask ^(uint) (1 << (x - 1));
-                string a_str = std::bitset<12>(static_cast<unsigned long long int>(tmp_bitmask)).to_string();
-                string sum_str = std::bitset<12>(static_cast<unsigned long long int>(current_bitmask)).to_string();
-
+//                string a_str = std::bitset<12>(static_cast<unsigned long long int>(tmp_bitmask)).to_string();
+//                string sum_str = std::bitset<12>(static_cast<unsigned long long int>(current_bitmask)).to_string();
+//
                 double calculated_prev = c[tmp_bitmask][j];
                 double calculated_distance = distances[get_combined_x_y_from_logical(x, y, count)];
                 double calculated_for_current_iteration = calculated_prev + calculated_distance;

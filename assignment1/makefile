@@ -5,7 +5,7 @@ threaded: threaded.cpp
 	g++ -pthread -o threaded threaded.cpp
 
 mpi: mpi.cpp
-	mpicxx -pthread -o mpi mpi.cpp
+	mpicxx -g -rdynamic -o mpi mpi.cpp
 
 clean:
 	rm sequential

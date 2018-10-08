@@ -211,8 +211,6 @@ double traveling_salesman(double *distances, int count, int *final_path) {
                     if (subsets[s_i] & j_bitmask && j != 1) { // check if j∈S
                         // C(S, j) = min{C(S−{j},i)+dij: i∈S, i≠j}
                         double min = INF;
-                        int min_i = 0;
-                        int min_j_bitmask = 0;
 
                         for (int i = 1; i <= count; i++) { // for each C(S−{j},i)+dij
                             int i_bitmask = 1 << (i - 1);
@@ -220,23 +218,12 @@ double traveling_salesman(double *distances, int count, int *final_path) {
                                 int array_position = get_combined_x_y_from_logical(i, j, count);
                                 double distance = c[subsets[s_i] & (~j_bitmask)][i] + distances[array_position];
                                 if (min > distance) {
-                                    min_j_bitmask = j_bitmask;
-                                    min_i = i;
                                     min = distance;
                                 }
                             }
                         }
 
                         c[subsets[s_i]][j] = min;
-
-//                        string previous_bitmask_string = std::bitset<12>(
-//                                static_cast<unsigned long long int>(subsets[s_i] & ~min_j_bitmask)).to_string();
-//                        string x = std::bitset<12>(static_cast<unsigned long long int>((subsets[s_i]))).to_string();
-//                        printf("\n\n    dl[%i][%i] + c[%s][%i]", j, min_i, previous_bitmask_string.c_str(), min_i);
-//                        printf("\n   %lf + %lf = %lf stored at c[%s][%i]",
-//                               distances[get_combined_x_y_from_logical(min_i, j, count)],
-//                               c[subsets[s_i] & ~min_j_bitmask][min_i],
-//                               min, x.c_str(), j);
                     }
                 }
             }
@@ -278,38 +265,21 @@ double traveling_salesman(double *distances, int count, int *final_path) {
             min - distances[get_combined_x_y_from_logical(final_path[0], final_path[1], count)];
     uint current_bitmask = full_bitmask;
     // for each city-slot available
-    for (int i = 2;
-         i <= count; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0] and final_path_cities[1]
-//        printf("\n\n\n");
-//    for (int i = 1; i < count + 1; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0]
+    for (int i = 2; i <= count; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0] and final_path_cities[1]
         // for each candidate city path taken
         for (int j = 1; j <= count; j++) {
             int x = final_path[i - 1]; // last city travelled to (used to figure out the distances to the current
             int y = j;
             if (x != y) {
                 uint tmp_bitmask = (uint) current_bitmask ^(uint) (1 << (x - 1));
-//                string a_str = std::bitset<12>(static_cast<unsigned long long int>(tmp_bitmask)).to_string();
-//                string sum_str = std::bitset<12>(static_cast<unsigned long long int>(current_bitmask)).to_string();
-//
+                printf("ISSUE CHILD %i from %i and %i\n", tmp_bitmask, current_bitmask, x);
                 double calculated_prev = c[tmp_bitmask][j];
                 double calculated_distance = distances[get_combined_x_y_from_logical(x, y, count)];
                 double calculated_for_current_iteration = calculated_prev + calculated_distance;
-//
-//                printf("\nc[%s][%i] + d[%i][%i] = c[%s][%i]\n", a_str.c_str(), j, x, y, sum_str.c_str(), j);
-//                printf("  %lf + %lf", calculated_prev, calculated_distance);
-//                printf(" = %lf", calculated_for_current_iteration);
-//                printf(" ==? %lf ???", current_sum);
-
                 bool is_this_it = abs(calculated_for_current_iteration - current_sum) < 0.000001;
-
-//                if (is_this_it) {
-//                    printf(" YES!!!  <---");
-//                }
 
                 if (is_this_it) {
                     final_path[i] = j;
-//                int x = final_path_cities[i - 1];
-//                int y = final_path_cities[i];
                     current_sum = current_sum - distances[get_combined_x_y_from_logical(x, y, count)];
                     current_bitmask = tmp_bitmask;
                     break;
@@ -326,8 +296,6 @@ void *run(points_container *container, int *final_path) {
 
     double min = 0;
     double *distances = get_distance_matrix(container);
-
-    final_path = (int *) malloc(city_count * sizeof(int));
 
     min = traveling_salesman(distances, city_count, final_path);
 
@@ -571,13 +539,18 @@ int main(int argc, char *argv[]) {
     MPI_Status stat;
     int number_of_points;
     int tag = 1;
+    int path_tag = 2;
     points_container *current_process_point_container;
     int *current_processes_final_path;
+
+    points_container *points;
+
+    struct timespec start, end;
 
     printf("I am rank %i out of %i\n", rank, total_tasks);
 
     if (argc != 2) {
-        cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
+        cout << "MPI-Usage: ./main tmp.txt\n" << endl;
         exit(0);
     }
 
@@ -587,15 +560,13 @@ int main(int argc, char *argv[]) {
         // load data, then broadcast to other nodes it is ready
         char *filename = argv[1];
 
-        struct timespec start, end;
-
         clock_gettime(CLOCK_MONOTONIC_RAW, &start);
 
         // create the point containers that will be used per thread.
         point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
         final_paths = (int **) malloc(NUM_THREADS * sizeof(int *));
 
-        points_container *points = get_the_points(filename);
+        points = get_the_points(filename);
 
 
         double min_x = points->points[0].x;
@@ -649,7 +620,7 @@ int main(int argc, char *argv[]) {
         }
 
         /*
-         * Send each block to each individial process (except rank = 0)
+         * Send each block to each individual process (except rank = 0)
          */
         for (int k = 0; k < NUM_THREADS; k++) {
             final_paths[k] = (int *) malloc(point_containers[k]->count * sizeof(int));
@@ -666,17 +637,14 @@ int main(int argc, char *argv[]) {
                     points_extrapolated[p * 2] = point_containers[k]->points[p].x;
                     points_extrapolated[(p * 2) + 1] = point_containers[k]->points[p].y;
 
-                    printf(" we sending k: %i, p:%i, (%lf,%lf)\n", k, p, points_extrapolated[p * 2], points_extrapolated[(p * 2) + 1]);
+//                    printf(" we sending k: %i, p:%i, (%lf,%lf)\n", k, p, points_extrapolated[p * 2],
+//                           points_extrapolated[(p * 2) + 1]);
                 }
 
-                for (int adsf = 0; adsf < point_containers[k]->count * 2; adsf++) {
-                    printf("sending this one [fur:%i] %lf", rank, points_extrapolated[adsf]);
-
-                }
-
-                MPI_Send(&points_extrapolated, point_containers[k]->count * 2, MPI_DOUBLE, k, tag, MPI_COMM_WORLD);
+                MPI_Send(points_extrapolated, point_containers[k]->count * 2, MPI_DOUBLE, k, tag, MPI_COMM_WORLD);
             } else {
                 current_process_point_container = point_containers[0];
+                current_processes_final_path = (int *) malloc(number_of_points * sizeof(int));
             }
         }
     } else {
@@ -689,6 +657,7 @@ int main(int argc, char *argv[]) {
         current_process_point_container = (points_container *) malloc(sizeof(points_container));
         current_process_point_container->count = number_of_points;
         current_process_point_container->points = (point *) malloc(number_of_points * sizeof(point));
+        current_processes_final_path = (int *) malloc(number_of_points * sizeof(int));
 
         for (int i = 0; i < number_of_points * 2; i++) {
             printf("got %lf\n", points_extrapolated[i]);
@@ -702,7 +671,8 @@ int main(int argc, char *argv[]) {
             (*p).y = points_extrapolated[(i * 2) + 1];
 
 //            printf("We got r:%i, i:%i   %lf\n", rank, i, points_extrapolated[0]);
-            printf("We got r:%i, i:%i, (%lf,%lf)\n", rank, i, points_extrapolated[i * 2], points_extrapolated[(i * 2) + 1]);
+            printf("We got r:%i, i:%i, (%lf,%lf)\n", rank, i, points_extrapolated[i * 2],
+                   points_extrapolated[(i * 2) + 1]);
         }
     }
 
@@ -713,25 +683,191 @@ int main(int argc, char *argv[]) {
 
     if (rank == 0) {
         for (int i = 1; i < NUM_THREADS; i++) {
-            MPI_Recv(final_paths[i], point_containers[i]->count, MPI_INT, i, tag, MPI_COMM_WORLD, &stat);
+            printf("pointer %p\n", &final_paths[i]);
+            final_paths[i] = (int *) malloc(point_containers[i]->count * sizeof(int));
+            printf("RECEIVING %i", i);
+            MPI_Recv(&final_paths[i][0], point_containers[i]->count, MPI_INT, i, path_tag, MPI_COMM_WORLD, &stat);
+            printf("RECEIVED %i", i);
+
+            printf("FOR EXAMPLE {%i}", final_paths[i][0]);
+
+//            final_paths[i] = final_path_from_process;
         }
     } else {
         // send data to master
-        MPI_Send(&current_processes_final_path, current_process_point_container->count, MPI_INT, 0, tag, MPI_COMM_WORLD);
+        printf("\n    rank %i sending path [%p]: \n", rank, &current_processes_final_path);
+
+        for (int j = 0; j < current_process_point_container->count; j++) {
+            printf("[%i]%i -> ", rank, current_processes_final_path[j]);
+        }
+        MPI_Send(current_processes_final_path, current_process_point_container->count, MPI_INT, 0, path_tag,
+                 MPI_COMM_WORLD);
     }
 
     if (rank == 0) {
         // complete everything!
         // I take it all back, I take it all back.
+        printf("complete everything");
 
-        for (int i = 1; i < NUM_THREADS; i++) {
+        for (int i = 1; i < NUM_THREADS; i++) { // TODO: handle all "threads"
             printf("\n for group %i:\n", i);
             for (int j = 0; j < point_containers[i]->count; j++) {
-                printf("%i -> ", final_paths[j]);
+                printf("%p -> \n", &final_paths[i][j]);
+                printf("%i -> \n", final_paths[i][j]);
             }
         }
     }
-//
+
+    if (rank == 0) {
+        grid_degrees = (int *) calloc(NUM_THREADS, sizeof(int));
+
+        points_container *full_path = (points_container *) malloc(sizeof(points_container));
+        full_path->points = (point *) malloc(points->count * sizeof(point));
+        full_path->count = points->count;
+        int full_path_index = 0;
+
+        /// First, mark all "already completed" grids as completed
+        for (int g_i = 0; g_i < NUM_THREADS; g_i++) {
+            points_container *g = point_containers[g_i];
+            printf("\ngrids got %i\n", g->count);
+            if (g->count == 0) {
+                grid_degrees[g_i] = 2;
+            }
+        }
+
+        // for all g \in G // this will run in parallel
+        for (int g_i = 0; g_i < 1; g_i++) { // TODO: run for all g_i < NUM_THREADS
+            points_container *g = point_containers[g_i];
+            grid_degrees[g_i] = 1;
+            // p-to-search = all p \in g
+            int count_p_to_search = g->count;
+            int *p_to_search = (int *) malloc((count_p_to_search + 1) * sizeof(int));
+            p_to_search = final_paths[g_i];
+            bool done = false;
+            // while true {
+            while (!done) {
+                // for all p \in p-to-search
+                for (int p_i = 0; p_i < count_p_to_search; p_i++) {
+                    /// Get Nearest neighbor
+                    int nn_grid_index = -1;
+                    int nn_p;
+                    int previous_nn_p;
+                    double nn_d = INF;
+                    // for all g' \in G, g' != g and degreeAllowed(g')
+                    for (int g1_i = 0; g1_i < NUM_THREADS; g1_i++) {
+                        if (g1_i != g_i && degreeAllowed(g1_i, NUM_THREADS)) {
+                            // for all p' \in g'
+                            printf("LISTED %i\n", grid_degrees[g1_i]);
+                            for (int p1_i = 1; p1_i <= point_containers[g1_i]->count; p1_i++) {
+                                if (grid_degrees[g1_i] == 0 || point_are_neighbors(full_path->points[0],
+                                                                                   point_containers[g1_i]->points[p1_i -
+                                                                                                                  1],
+                                                                                   point_containers[g1_i],
+                                                                                   final_paths[g1_i])) {
+                                    // d = distance(p, p')
+                                    double d = distance(&point_containers[g_i]->points[p_to_search[p_i] - 1],
+                                                        &point_containers[g1_i]->points[p1_i - 1]);
+                                    // if d < nn_d
+                                    if (d < nn_d) {
+                                        // nn_grid_index = g'-index
+                                        // nn_p = p'
+                                        // nn_d = d
+                                        nn_grid_index = g1_i;
+                                        nn_p = p1_i;
+                                        nn_d = d;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    /// We've got the Nearest neighbor
+//                printf("we got a nearest neighbor \n");
+                    point *a = &point_containers[g_i]->points[p_to_search[p_i] - 1];
+                    point *b = &point_containers[nn_grid_index]->points[nn_p - 1];
+                    printf("connector.put(%i, [%lf %lf;%lf %lf]);\n", NUM_THREADS - degreesLeft(NUM_THREADS), a->x,
+                           a->y,
+                           b->x, b->y);
+
+                    // if best_selected_point
+
+                    for (int i = 0; i < point_containers[g_i]->count; i++) {
+                        printf("%i -> ", final_paths[g_i][i]);
+                    }
+
+                    point *point_we_are_about_to_add = &point_containers[g_i]->points[p_to_search[p_i] - 1];
+
+                    if (full_path_index != 0) { // don't add the previous graph if we haven't added anything as of yet
+                        // push the values for the grid we are leaving behind
+                        // if best neighbor was previous neighbor
+                        add_sub_graph(&full_path, &full_path_index, g_i, previous_nn_p, p_to_search, p_i);
+                    }
+
+                    full_path->points[full_path_index++] = *point_we_are_about_to_add;
+                    full_path->points[full_path_index++] = point_containers[nn_grid_index]->points[nn_p - 1];
+
+                    updateDegree(nn_grid_index);
+
+                    if (degreesAllEqual2(NUM_THREADS)) {
+                        int candidate_city_identifier = get_city_identifier(full_path->points[0],
+                                                                            point_containers[nn_grid_index]);
+//                    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, point_containers[nn_grid_index], final_path);
+                        int *fake_p_to_search = (int *) malloc(sizeof(int));
+                        fake_p_to_search[0] = candidate_city_identifier;
+                        add_sub_graph(&full_path, &full_path_index, nn_grid_index, nn_p, fake_p_to_search, 0);
+
+                        // break
+                        done = true;
+                        break;
+                    }
+
+                    previous_nn_p = nn_p;
+                    g_i = nn_grid_index;
+
+                    // count_p_to_search = get_count_p_to_search(G[nn_grid_index])
+                    count_p_to_search = get_count_p_to_search(point_containers[nn_grid_index]);
+                    // p-to-search = get_p_to_search(nn_p, G[nn_grid_index])
+                    p_to_search = get_p_to_search(nn_p, point_containers[nn_grid_index], final_paths[nn_grid_index]);
+                }
+            }
+        }
+
+
+        // handle inversions
+        int point_count = full_path_index - 1;
+        full_path->count = point_count;
+        for (int i = 0; i < 100; i++) {
+//        printf("INVERSIONS?\n");
+            int intersection_count = 0;
+            for (int x0 = 0; x0 < point_count - 2; x0++) {
+                int x1 = x0 + 1;
+
+                for (int y_i = 0; y_i < point_count - 1 - 2; y_i++) {
+                    int y0 = (y_i + x1 + 1) % full_path->count;
+                    int y1 = (y0 + 1) % full_path->count;
+
+//            printf("max[%i] %i,%i  -> %i,%i\n", points->count, x0, x1, y0, y1);
+                    if (pointsIntersect(full_path->points[x0], full_path->points[x1], full_path->points[y0],
+                                        full_path->points[y1])) {
+                        handleInversion(&full_path, x1, y0);
+                        intersection_count++;
+                    }
+                }
+            }
+        }
+
+        printf("\nconnected_connectors = [");
+        for (int k = 0; k < full_path_index - 1; k++) {
+            printf("%lf %lf;", full_path->points[k].x, full_path->points[k].y);
+        }
+        printf("]\n");
+
+        clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+        uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
+
+        printf("time (ms): %llu\n", diff);
+    }
+
     MPI_Finalize();
 //
 //    /**
@@ -740,152 +876,5 @@ int main(int argc, char *argv[]) {
 //     *
 //     */
 //
-//    printf("\nMPI complete %i\n", rank);
-
-
-//    grid_degrees = (int *) calloc(NUM_THREADS, sizeof(int));
-//
-//    points_container *full_path = (points_container *) malloc(sizeof(points_container));
-//    full_path->points = (point *) malloc(points->count * sizeof(point));
-//    full_path->count = points->count;
-//    int full_path_index = 0;
-//
-//    /// First, mark all "already completed" grids as completed
-//    for (int g_i = 0; g_i < NUM_THREADS; g_i++) {
-//        points_container *g = point_containers[g_i];
-//        printf("\ngrids got %i\n", g->count);
-//        if (g->count == 0) {
-//            grid_degrees[g_i] = 2;
-//        }
-//    }
-//
-//    // for all g \in G // this will run in parallel
-//    for (int g_i = 0; g_i < 1; g_i++) { // TODO: run for all g_i < NUM_THREADS
-//        points_container *g = point_containers[g_i];
-//        grid_degrees[g_i] = 1;
-//        // p-to-search = all p \in g
-//        int count_p_to_search = g->count;
-//        int *p_to_search = (int *) malloc((count_p_to_search + 1) * sizeof(int));
-//        p_to_search = final_paths[g_i];
-//        bool done = false;
-//        // while true {
-//        while (!done) {
-//            // for all p \in p-to-search
-//            for (int p_i = 0; p_i < count_p_to_search; p_i++) {
-//                /// Get Nearest neighbor
-//                int nn_grid_index = -1;
-//                int nn_p;
-//                int previous_nn_p;
-//                double nn_d = INF;
-//                // for all g' \in G, g' != g and degreeAllowed(g')
-//                for (int g1_i = 0; g1_i < NUM_THREADS; g1_i++) {
-//                    if (g1_i != g_i && degreeAllowed(g1_i, NUM_THREADS)) {
-//                        // for all p' \in g'
-//                        printf("LISTED %i\n", grid_degrees[g1_i]);
-//                        for (int p1_i = 1; p1_i <= point_containers[g1_i]->count; p1_i++) {
-//                            if (grid_degrees[g1_i] == 0 || point_are_neighbors(full_path->points[0],
-//                                                                               point_containers[g1_i]->points[p1_i - 1],
-//                                                                               point_containers[g1_i],
-//                                                                               final_paths[g1_i])) {
-//                                // d = distance(p, p')
-//                                double d = distance(&point_containers[g_i]->points[p_to_search[p_i] - 1],
-//                                                    &point_containers[g1_i]->points[p1_i - 1]);
-//                                // if d < nn_d
-//                                if (d < nn_d) {
-//                                    // nn_grid_index = g'-index
-//                                    // nn_p = p'
-//                                    // nn_d = d
-//                                    nn_grid_index = g1_i;
-//                                    nn_p = p1_i;
-//                                    nn_d = d;
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//
-//                /// We've got the Nearest neighbor
-////                printf("we got a nearest neighbor \n");
-//                point *a = &point_containers[g_i]->points[p_to_search[p_i] - 1];
-//                point *b = &point_containers[nn_grid_index]->points[nn_p - 1];
-//                printf("connector.put(%i, [%lf %lf;%lf %lf]);\n", NUM_THREADS - degreesLeft(NUM_THREADS), a->x, a->y,
-//                       b->x, b->y);
-//
-//                // if best_selected_point
-//
-//                for (int i = 0; i < point_containers[g_i]->count; i++) {
-//                    printf("%i -> ", final_paths[g_i][i]);
-//                }
-//
-//                point *point_we_are_about_to_add = &point_containers[g_i]->points[p_to_search[p_i] - 1];
-//
-//                if (full_path_index != 0) { // don't add the previous graph if we haven't added anything as of yet
-//                    // push the values for the grid we are leaving behind
-//                    // if best neighbor was previous neighbor
-//                    add_sub_graph(&full_path, &full_path_index, g_i, previous_nn_p, p_to_search, p_i);
-//                }
-//
-//                full_path->points[full_path_index++] = *point_we_are_about_to_add;
-//                full_path->points[full_path_index++] = point_containers[nn_grid_index]->points[nn_p - 1];
-//
-//                updateDegree(nn_grid_index);
-//
-//                if (degreesAllEqual2(NUM_THREADS)) {
-//                    int candidate_city_identifier = get_city_identifier(full_path->points[0],
-//                                                                        point_containers[nn_grid_index]);
-////                    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, point_containers[nn_grid_index], final_path);
-//                    int *fake_p_to_search = (int *) malloc(sizeof(int));
-//                    fake_p_to_search[0] = candidate_city_identifier;
-//                    add_sub_graph(&full_path, &full_path_index, nn_grid_index, nn_p, fake_p_to_search, 0);
-//
-//                    // break
-//                    done = true;
-//                    break;
-//                }
-//
-//                previous_nn_p = nn_p;
-//                g_i = nn_grid_index;
-//
-//                // count_p_to_search = get_count_p_to_search(G[nn_grid_index])
-//                count_p_to_search = get_count_p_to_search(point_containers[nn_grid_index]);
-//                // p-to-search = get_p_to_search(nn_p, G[nn_grid_index])
-//                p_to_search = get_p_to_search(nn_p, point_containers[nn_grid_index], final_paths[nn_grid_index]);
-//            }
-//        }
-//    }
-//
-//
-//    // handle inversions
-//    int point_count = full_path_index - 1;
-//    full_path->count = point_count;
-//    for (int i = 0; i < 100; i++) {
-////        printf("INVERSIONS?\n");
-//        int intersection_count = 0;
-//        for (int x0 = 0; x0 < point_count - 2; x0++) {
-//            int x1 = x0 + 1;
-//
-//            for (int y_i = 0; y_i < point_count - 1 - 2; y_i++) {
-//                int y0 = (y_i + x1 + 1) % full_path->count;
-//                int y1 = (y0 + 1) % full_path->count;
-//
-////            printf("max[%i] %i,%i  -> %i,%i\n", points->count, x0, x1, y0, y1);
-//                if (pointsIntersect(full_path->points[x0], full_path->points[x1], full_path->points[y0],
-//                                    full_path->points[y1])) {
-//                    handleInversion(&full_path, x1, y0);
-//                    intersection_count++;
-//                }
-//            }
-//        }
-//    }
-//
-//    printf("\nconnected_connectors = [");
-//    for (int k = 0; k < full_path_index - 1; k++) {
-//        printf("%lf %lf;", full_path->points[k].x, full_path->points[k].y);
-//    }
-//    printf("]\n");
-//
-//    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-//    uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
-//
-//    printf("time (ms): %llu\n", diff);
+    printf("\nMPI complete %i\n", rank);
 }

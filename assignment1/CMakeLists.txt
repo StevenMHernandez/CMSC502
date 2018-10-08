@@ -24,6 +24,9 @@ add_executable(${PROJECT_NAME}MPI
 
 find_package(MPI REQUIRED)
 
+set(CMAKE_C_COMPILER /usr/local/bin/mpicc)
+set(CMAKE_CXX_COMPILER /usr/local/bin/mpic++)
+
 include_directories(${MPI_INCLUDE_PATH})
 target_link_libraries(${PROJECT_NAME}MPI ${MPI_LIBRARIES})
 

@@ -22,5 +22,11 @@ add_executable(${PROJECT_NAME}MPI
         )
 
 
+find_package(MPI REQUIRED)
+
+include_directories(${MPI_INCLUDE_PATH})
+target_link_libraries(${PROJECT_NAME}MPI ${MPI_LIBRARIES})
+
+
 source_group("Header include" FILES ${HEADER})
 source_group("Source src"     FILES ${SOURCE})

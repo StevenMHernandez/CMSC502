@@ -321,17 +321,17 @@ double traveling_salesman(double *distances, int count, int *final_path) {
     return min;
 }
 
-void *run(int rank) {
-    int city_count = point_containers[rank]->count;
+void *run(points_container *container, int *final_path) {
+    int city_count = container->count;
 
     double min = 0;
-    double *distances = get_distance_matrix(point_containers[rank]);
+    double *distances = get_distance_matrix(container);
 
-    final_paths[rank] = (int *) malloc(city_count * sizeof(int));
+    final_path = (int *) malloc(city_count * sizeof(int));
 
-    min = traveling_salesman(distances, city_count, final_paths[rank]);
+    min = traveling_salesman(distances, city_count, final_path);
 
-    results[rank] = min;
+//    results[rank] = min;
 }
 
 
@@ -566,24 +566,30 @@ int main(int argc, char *argv[]) {
 
     int rank, total_tasks;
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &total_tasks); // This will need to be a power of 2 right now.
+    MPI_Comm_size(MPI_COMM_WORLD, &total_tasks); // This will need to be a power of 4 right now.
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Status stat;
+    int number_of_points;
+    int tag = 1;
+    points_container *current_process_point_container;
+    int *current_processes_final_path;
 
+    printf("I am rank %i out of %i\n", rank, total_tasks);
+
+    if (argc != 2) {
+        cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
+        exit(0);
+    }
+
+    int NUM_THREADS = total_tasks;
 
     if (rank == 0) {
         // load data, then broadcast to other nodes it is ready
-
-        if (argc != 2) {
-            cout << "Threaded-Usage: ./main tmp.txt\n" << endl;
-            exit(0);
-        }
         char *filename = argv[1];
 
         struct timespec start, end;
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-
-        int NUM_THREADS = 16;
 
         // create the point containers that will be used per thread.
         point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
@@ -641,31 +647,100 @@ int main(int argc, char *argv[]) {
 
             block_pointer_indices[block_i]++;
         }
+
+        /*
+         * Send each block to each individial process (except rank = 0)
+         */
+        for (int k = 0; k < NUM_THREADS; k++) {
+            final_paths[k] = (int *) malloc(point_containers[k]->count * sizeof(int));
+
+            if (k != 0) {
+                // send each point (2 doubles each)
+                MPI_Send(&point_containers[k]->count, 1, MPI_INT, k, tag, MPI_COMM_WORLD);
+
+                double *points_extrapolated = (double *) malloc(point_containers[k]->count * 2 * sizeof(double));
+
+                printf("will send %i to rank %i\n", point_containers[k]->count, k);
+
+                for (int p = 0; p < point_containers[k]->count; p++) {
+                    points_extrapolated[p * 2] = point_containers[k]->points[p].x;
+                    points_extrapolated[(p * 2) + 1] = point_containers[k]->points[p].y;
+
+                    printf(" we sending k: %i, p:%i, (%lf,%lf)\n", k, p, points_extrapolated[p * 2], points_extrapolated[(p * 2) + 1]);
+                }
+
+                for (int adsf = 0; adsf < point_containers[k]->count * 2; adsf++) {
+                    printf("sending this one [fur:%i] %lf", rank, points_extrapolated[adsf]);
+
+                }
+
+                MPI_Send(&points_extrapolated, point_containers[k]->count * 2, MPI_DOUBLE, k, tag, MPI_COMM_WORLD);
+            } else {
+                current_process_point_container = point_containers[0];
+            }
+        }
+    } else {
+        MPI_Recv(&number_of_points, 1, MPI_INT, 0, tag, MPI_COMM_WORLD, &stat);
+
+        double *points_extrapolated = (double *) malloc(number_of_points * 2 * sizeof(double));
+
+        MPI_Recv(points_extrapolated, number_of_points * 2, MPI_DOUBLE, 0, tag, MPI_COMM_WORLD, &stat);
+
+        current_process_point_container = (points_container *) malloc(sizeof(points_container));
+        current_process_point_container->count = number_of_points;
+        current_process_point_container->points = (point *) malloc(number_of_points * sizeof(point));
+
+        for (int i = 0; i < number_of_points * 2; i++) {
+            printf("got %lf\n", points_extrapolated[i]);
+        }
+
+        for (int i = 0; i < number_of_points; i++) {
+            point *p = &current_process_point_container->points[i / 2];
+            *p = point();
+//
+            (*p).x = points_extrapolated[i * 2];
+            (*p).y = points_extrapolated[(i * 2) + 1];
+
+//            printf("We got r:%i, i:%i   %lf\n", rank, i, points_extrapolated[0]);
+            printf("We got r:%i, i:%i, (%lf,%lf)\n", rank, i, points_extrapolated[i * 2], points_extrapolated[(i * 2) + 1]);
+        }
     }
 
-    int *example = (int *) malloc(sizeof(int));
-    *example = 9;
-    MPI_Bcast(example,1, MPI_INT, 0, MPI_COMM_WORLD);
+    printf("I am rank %i, I received %i points stored at %p\n", rank, number_of_points, &number_of_points);
 
-//    run(rank);
+    run(current_process_point_container, current_processes_final_path);
 
-    printf("I am rank %i, I DID get %i (stored at %p) and I can see %i points (stored at %p)!", rank, *example, example,  point_containers[rank]->count, point_containers[rank]);
 
     if (rank == 0) {
-
+        for (int i = 1; i < NUM_THREADS; i++) {
+            MPI_Recv(final_paths[i], point_containers[i]->count, MPI_INT, i, tag, MPI_COMM_WORLD, &stat);
+        }
     } else {
-        // wait for data to be loaded from master
+        // send data to master
+        MPI_Send(&current_processes_final_path, current_process_point_container->count, MPI_INT, 0, tag, MPI_COMM_WORLD);
     }
 
+    if (rank == 0) {
+        // complete everything!
+        // I take it all back, I take it all back.
+
+        for (int i = 1; i < NUM_THREADS; i++) {
+            printf("\n for group %i:\n", i);
+            for (int j = 0; j < point_containers[i]->count; j++) {
+                printf("%i -> ", final_paths[j]);
+            }
+        }
+    }
+//
     MPI_Finalize();
-
-    /**
-     *
-     * End MPI Specific Code
-     *
-     */
-
-    printf("MPI complete");
+//
+//    /**
+//     *
+//     * End MPI Specific Code
+//     *
+//     */
+//
+//    printf("\nMPI complete %i\n", rank);
 
 
 //    grid_degrees = (int *) calloc(NUM_THREADS, sizeof(int));

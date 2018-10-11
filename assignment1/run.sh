@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 make clean
 
 make sequential
@@ -28,4 +30,24 @@ make mpi
 #    mpirun -np 4 ./mpi tmp.txt >> tmp/mpi_runs.txt
 #done
 
-echo "done"
+echo "done with timing runs"
+
+
+echo "starting accuracy runs"
+
+# Time tests (sequential)
+echo "\c" > tmp/accuracy_runs.txt
+for ((i=15;i<=25;i++)); do
+    sh gen_cities.sh $i > tmp.txt
+
+    echo "run $i: \c" >> tmp/accuracy_runs.txt
+
+    ./sequential tmp.txt >> tmp/accuracy_runs.txt
+    echo ", \c" >> tmp/accuracy_runs.txt
+    ./threaded tmp.txt >> tmp/accuracy_runs.txt
+    echo ", \c" >> tmp/accuracy_runs.txt
+    mpirun -np 4 ./mpi tmp.txt >> tmp/accuracy_runs.txt
+    echo "" >> tmp/accuracy_runs.txt
+done
+
+echo "done with accuracy runs"

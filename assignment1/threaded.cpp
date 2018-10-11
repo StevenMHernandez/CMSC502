@@ -792,5 +792,14 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
 
-    printf("time (ms): %llu\n", diff);
+//    printf("time (ms): %llu\n", diff);
+
+    double min = 0;
+
+    for (int k = 0; k < full_path_index - 1 - 1; k++) {
+        min += distance(&full_path->points[k], &full_path->points[k + 1]);
+//        printf("%lf %lf;", full_path->points[k].x, full_path->points[k].y);
+    }
+
+    printf("%lf", min);
 }

@@ -299,4 +299,7 @@ legend("Sequential","Threaded (16 threads)","MPI (4 processes)");
 
 xlabel("# of cities");
 ylabel("time taken (ms)");
+
+title("Time taken per Method")
+
 hold off;

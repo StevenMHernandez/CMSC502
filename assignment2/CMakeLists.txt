@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(CMSC502Project1)
+project(CMSC502Project2)
 
 # find header & source
 file(GLOB_RECURSE SOURCE "mpi.cpp")

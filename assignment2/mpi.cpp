@@ -81,6 +81,12 @@ void add_sub_graph(points_container **full_path, int *full_path_index, int g_i, 
 
 #define INF DBL_MAX;
 
+#define POINTS_PER_BLOCK 10
+
+#define GENERATE_POINTS_TAG 1
+#define SEND_POINTS_TAG 2
+#define RECEIV_PATH_TAG 3
+
 /**
  *
  * MAIN
@@ -92,15 +98,11 @@ int main(int argc, char *argv[]) {
      * MPI Code
      *
      */
-
     int rank, total_tasks;
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &total_tasks); // This will need to be a power of 4 right now.
+    MPI_Comm_size(MPI_COMM_WORLD, &total_tasks); // This will need to be a square number such that y = \sqrt(x) where x and y are positive integers.
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Status stat;
-    int number_of_points;
-    int tag = 1;
-    int path_tag = 2;
     points_container *current_process_point_container;
     int *current_processes_final_path;
 
@@ -108,139 +110,86 @@ int main(int argc, char *argv[]) {
 
     struct timespec start, end;
 
-    if (argc != 2) {
-        cout << "MPI-Usage: ./main tmp.txt\n" << endl;
-        exit(0);
-    }
-
     int NUM_THREADS = total_tasks;
 
+    int blocks_per_dimension = static_cast<int>(sqrt(total_tasks));
+
+    /// Use the MPI Cartesian Topology
+    MPI_Comm communicator;
+    int dim_size[2] = {blocks_per_dimension, blocks_per_dimension};
+    int periods[2] = {0,0};
+    int ierr = MPI_Cart_create(MPI_COMM_WORLD, 2, dim_size, periods, 0, &communicator);
+
+    /**
+     * Master Node mallocs the required array spaces to receive path information from the slave processes
+     * NOTE: this might not be required fully! I should plan more first!
+     */
     if (rank == 0) {
-        // load data, then broadcast to other nodes it is ready
-        char *filename = argv[1];
-
-        clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-
-        // create the point containers that will be used per thread.
-        point_containers = (points_container **) malloc(sizeof(points_container *) * NUM_THREADS);
-        final_paths = (int **) malloc(NUM_THREADS * sizeof(int *));
-
-        points = get_the_points(filename);
-
-
-        double min_x = points->points[0].x;
-        double max_x = points->points[0].x;
-        double min_y = points->points[0].y;
-        double max_y = points->points[0].y;
-        for (int i = 0; i < points->count; i++) {
-            min_x = min(min_x, floor(points->points[i].x));
-            max_x = max(max_x, ceil(points->points[i].x));
-            min_y = min(min_x, floor(points->points[i].y));
-            max_y = max(max_x, ceil(points->points[i].y));
-        }
-        double range_x = max_x - min_x;
-        double block_range_x = ceil((range_x + 1) / sqrt(NUM_THREADS));
-        double range_y = max_y - min_y;
-        double block_range_y = ceil((range_y + 1) / sqrt(NUM_THREADS));
-
-        // TODO: count how many elements are stored in each grid block so that we can malloc it
-        int *block_sizes = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
-
-        // count how many points each block should have
-        for (int i = 0; i < points->count; i++) {
-            point p = points->points[i];
-            int x_block = (int) floor((p.x - min_x) / block_range_x);
-            int y_block = (int) floor((p.y - min_y) / block_range_y);
-
-            block_sizes[(x_block * (int) sqrt(NUM_THREADS)) + y_block]++;
-        }
-
-        // initialize data structure for each grid block
-        for (int j = 0; j < NUM_THREADS; j++) {
-            point_containers[j] = (points_container *) malloc(sizeof(points_container));
-            point_containers[j]->points = (point *) malloc(block_sizes[j] * sizeof(point));
-            point_containers[j]->count = block_sizes[j];
-        }
-
-        // populate each grid block
-        int *block_pointer_indices = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
-        for (int i = 0; i < points->count; i++) {
-            point p = points->points[i];
-            int x_block = (int) floor((p.x - min_x) / block_range_x);
-            int y_block = (int) floor((p.y - min_y) / block_range_y);
-
-            int block_i = (x_block * (int) sqrt(NUM_THREADS)) + y_block;
-
-            int index = block_pointer_indices[block_i];
-
-            memcpy(&point_containers[block_i]->points[index], &p, sizeof(point));
-
-            block_pointer_indices[block_i]++;
-        }
-
-        /*
-         * Send each block to each individual process (except rank = 0)
-         */
-        for (int k = 0; k < NUM_THREADS; k++) {
-            final_paths[k] = (int *) malloc(point_containers[k]->count * sizeof(int));
-
-            if (k != 0) {
-                // send each point (2 doubles each)
-                MPI_Send(&point_containers[k]->count, 1, MPI_INT, k, tag, MPI_COMM_WORLD);
-
-                double *points_extrapolated = (double *) malloc(point_containers[k]->count * 2 * sizeof(double));
-
-                for (int p = 0; p < point_containers[k]->count; p++) {
-                    points_extrapolated[p * 2] = point_containers[k]->points[p].x;
-                    points_extrapolated[(p * 2) + 1] = point_containers[k]->points[p].y;
-                }
-
-                MPI_Send(points_extrapolated, point_containers[k]->count * 2, MPI_DOUBLE, k, tag, MPI_COMM_WORLD);
-            } else {
-                number_of_points = point_containers[0]->count;
-
-                current_process_point_container = (points_container *) malloc(sizeof(points_container));
-                current_process_point_container->count = number_of_points;
-                current_process_point_container->points = point_containers[0]->points;
-
-            }
-        }
-    } else {
-        MPI_Recv(&number_of_points, 1, MPI_INT, 0, tag, MPI_COMM_WORLD, &stat);
-
-        double *points_extrapolated = (double *) malloc(number_of_points * 2 * sizeof(double));
-
-        MPI_Recv(points_extrapolated, number_of_points * 2, MPI_DOUBLE, 0, tag, MPI_COMM_WORLD, &stat);
-
-        current_process_point_container = (points_container *) malloc(sizeof(points_container));
-        current_process_point_container->count = number_of_points;
-        current_process_point_container->points = (point *) malloc(number_of_points * sizeof(point));
-
-        for (int i = 0; i < number_of_points; i++) {
-            point *p = &(current_process_point_container->points[i]);
-            *p = point();
-//
-            (*p).x = points_extrapolated[i * 2];
-            (*p).y = points_extrapolated[(i * 2) + 1];
-        }
+        // TODO
     }
 
-    current_processes_final_path = (int *) malloc(number_of_points * sizeof(int));
+    // Calculate row by row starting from the bottom left
+    int block_row = static_cast<int>(floor(rank / blocks_per_dimension));
+    int block_col = rank % blocks_per_dimension;
 
-    run(current_process_point_container, current_processes_final_path);
+    /**
+     * First, we generate all data in parallel AND calculate the TSP in one step.
+     */
+    current_process_point_container = (points_container *) malloc(sizeof(points_container));
+    current_process_point_container->count = POINTS_PER_BLOCK;
+    current_process_point_container->points = (point *) malloc(POINTS_PER_BLOCK * sizeof(point));
+
+    /// Generate points for the current process
+    for (int i = 0; i < POINTS_PER_BLOCK; i++) {
+        point *p = &(current_process_point_container->points[i]);
+        *p = point();
+
+        (*p).x = (rand() / (double) RAND_MAX) * 100 + (100 * (block_row + 1));
+        (*p).y = (rand() / (double) RAND_MAX) * 100 + (100 * (block_col + 1));
+
+        // Print the points generated by the current process.
+        // Format: "identifier,rank,x,y"
+//        printf("generated_points,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
+    }
+
+    current_processes_final_path = (int *) malloc(POINTS_PER_BLOCK * sizeof(int));
+
+    /// Run sub TSP computation
+    run_tsp(current_process_point_container, current_processes_final_path);
+
+    /// Sort the points by the tsp
+    points_container *sorted_point_container = (points_container *) malloc(sizeof(points_container));
+    sorted_point_container->count = POINTS_PER_BLOCK;
+    sorted_point_container->points = (point *) malloc(POINTS_PER_BLOCK * sizeof(point));
+    for (int i = 0; i < POINTS_PER_BLOCK; i++) {
+        sorted_point_container->points[i] = current_process_point_container->points[current_processes_final_path[i] - 1];
+        point *p = &(sorted_point_container->points[i]);
+
+        // Print the points selected in order as selected by the TSP
+        // Format: "identifier,rank,x,y"
+//        printf("sub_tsp_path,%i,%lf,%lf\n",rank, (*p).x, (*p).y);
+    }
+    free(current_processes_final_path);
+    free(current_process_point_container);
+    current_process_point_container = sorted_point_container;
 
 
+    /**
+     * TODO: this is old code clean it up!
+     */
+     MPI_Finalize();
+     return 0;
     if (rank == 0) {
         final_paths[0] = (int *) malloc(point_containers[0]->count * sizeof(int));
         final_paths[0] = current_processes_final_path;
 
         for (int i = 1; i < NUM_THREADS; i++) {
             final_paths[i] = (int *) malloc(point_containers[i]->count * sizeof(int));
-            MPI_Recv(&final_paths[i][0], point_containers[i]->count, MPI_INT, i, path_tag, MPI_COMM_WORLD, &stat);
+            MPI_Recv(&final_paths[i][0], point_containers[i]->count, MPI_INT, i, RECEIV_PATH_TAG, MPI_COMM_WORLD, &stat);
         }
     } else {
         // send data to master
-        MPI_Send(current_processes_final_path, current_process_point_container->count, MPI_INT, 0, path_tag,
+        MPI_Send(current_processes_final_path, current_process_point_container->count, MPI_INT, 0, RECEIV_PATH_TAG,
                  MPI_COMM_WORLD);
 
         MPI_Finalize();
@@ -381,7 +330,6 @@ int main(int argc, char *argv[]) {
     }
 
     if (rank == 0) {
-
         // check if things are correct around here.
         MPI_Finalize();
     }

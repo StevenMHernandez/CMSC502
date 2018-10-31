@@ -167,8 +167,8 @@ int main(int argc, char *argv[]) {
         // Format: "identifier,rank,x,y"
 //        printf("sub_tsp_path,%i,%lf,%lf\n",rank, (*p).x, (*p).y);
     }
-    free(current_processes_final_path);
-    free(current_process_point_container);
+//    free(current_processes_final_path);
+//    free(current_process_point_container);
     current_process_point_container = sorted_point_container;
 
 

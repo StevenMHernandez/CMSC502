@@ -90,7 +90,6 @@ double *get_distance_matrix(points_container *container) {
         for (int j = 0; j < container->count; j++) {
             distances[(j * container->count) + i] = sqrt(pow(container->points[i].x - container->points[j].x, 2) +
                                                          pow(container->points[i].y - container->points[j].y, 2));
-//            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
         }
     }
 
@@ -169,7 +168,6 @@ double traveling_salesman(double *distances, int count, int *final_path) {
     // bugfix -> handle when count == 2
     if (count == 2) { return 2 * distances[1]; }
 
-//    printf("Making %li * sizeof(double)\n", static_cast<long>((1 << count) * count));
     double **c = (double **) malloc(static_cast<long>((1 << count)) * sizeof(double *));
 
     for (int i = 0; i < (1 << count); i++) {
@@ -210,15 +208,6 @@ double traveling_salesman(double *distances, int count, int *final_path) {
                         }
 
                         c[subsets[s_i]][j] = min;
-
-//                        string previous_bitmask_string = std::bitset<12>(
-//                                static_cast<unsigned long long int>(subsets[s_i] & ~min_j_bitmask)).to_string();
-//                        string x = std::bitset<12>(static_cast<unsigned long long int>((subsets[s_i]))).to_string();
-//                        printf("\n\n    dl[%i][%i] + c[%s][%i]", j, min_i, previous_bitmask_string.c_str(), min_i);
-//                        printf("\n   %lf + %lf = %lf stored at c[%s][%i]",
-//                               distances[get_combined_x_y_from_logical(min_i, j, count)],
-//                               c[subsets[s_i] & ~min_j_bitmask][min_i],
-//                               min, x.c_str(), j);
                     }
                 }
             }
@@ -247,13 +236,9 @@ double traveling_salesman(double *distances, int count, int *final_path) {
     /*
      * Go backwards and determine the path
      */
-//    int *final_path_cities = (int *) malloc((count + 1) * sizeof(int));
-
     final_path[0] = 1;
     // we know the next city because we calculated that just now:
     final_path[1] = min_i;
-
-//    printf("\n hey at least we know [0] -> 0 and [1] -> %i", min_i);
 
     // find each city travelled to
     double current_sum =
@@ -261,36 +246,21 @@ double traveling_salesman(double *distances, int count, int *final_path) {
     uint current_bitmask = full_bitmask;
     // for each city-slot available
     for (int i = 2; i <= count; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0] and final_path_cities[1]
-//        printf("\n\n\n");
-//    for (int i = 1; i < count + 1; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0]
         // for each candidate city path taken
         for (int j = 1; j <= count; j++) {
             int x = final_path[i - 1]; // last city travelled to (used to figure out the distances to the current
             int y = j;
             if (x != y) {
                 uint tmp_bitmask = (uint) current_bitmask ^(uint) (1 << (x - 1));
-//                string a_str = std::bitset<12>(static_cast<unsigned long long int>(tmp_bitmask)).to_string();
-//                string sum_str = std::bitset<12>(static_cast<unsigned long long int>(current_bitmask)).to_string();
-//
+
                 double calculated_prev = c[tmp_bitmask][j];
                 double calculated_distance = distances[get_combined_x_y_from_logical(x, y, count)];
                 double calculated_for_current_iteration = calculated_prev + calculated_distance;
 
-//                printf("\nc[%s][%i] + d[%i][%i] = c[%s][%i]\n", a_str.c_str(), j, x, y, sum_str.c_str(), j);
-//                printf("  %lf + %lf", calculated_prev, calculated_distance);
-//                printf(" = %lf", calculated_for_current_iteration);
-//                printf(" ==? %lf ???", current_sum);
-
                 bool is_this_it = abs(calculated_for_current_iteration - current_sum) < 0.000001;
-
-//                if (is_this_it) {
-//                    printf(" YES!!!  <---");
-//                }
 
                 if (is_this_it) {
                     final_path[i] = j;
-//                int x = final_path_cities[i - 1];
-//                int y = final_path_cities[i];
                     current_sum = current_sum - distances[get_combined_x_y_from_logical(x, y, count)];
                     current_bitmask = tmp_bitmask;
                     break;
@@ -313,8 +283,6 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     char *filename = argv[1];
-
-//    printf("%s\n", argv[1]);
 
     points_container *points = get_the_points(filename);
 

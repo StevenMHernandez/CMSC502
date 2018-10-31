@@ -41,13 +41,11 @@ int degreesLeft(int count) {
     int counter = 0;
 
     for (int i = 0; i < count; i++) {
-//        printf("%i ", grid_degrees[i]);
         if (grid_degrees[i] < 2) {
             counter += 1;
         }
     }
 
-    //    printf("   left=%i\n", counter);
     return counter;
 }
 
@@ -58,7 +56,6 @@ bool degreesAllEqual2(int count) {
 void add_sub_graph(points_container **full_path, int *full_path_index, int g_i, int previous_nn_p, int *p_to_search,
                    int p_i) {
     if (point_containers[g_i]->count > 1) {
-        // printf("{%i} {%i}", p_to_search[1], p_to_search[0]);
         int index_of_initial = find_index_in_path_for_point(previous_nn_p, point_containers[g_i],
                                                             final_paths[g_i]);
 
@@ -200,8 +197,6 @@ int main(int argc, char *argv[]) {
 
                 MPI_Send(points_extrapolated, point_containers[k]->count * 2, MPI_DOUBLE, k, tag, MPI_COMM_WORLD);
             } else {
-//                current_process_point_container = point_containers[0];
-
                 number_of_points = point_containers[0]->count;
 
                 current_process_point_container = (points_container *) malloc(sizeof(points_container));
@@ -289,7 +284,6 @@ int main(int argc, char *argv[]) {
                     for (int g1_i = 0; g1_i < NUM_THREADS; g1_i++) {
                         if (g1_i != g_i && degreeAllowed(g1_i, NUM_THREADS)) {
                             // for all p' \in g'
-//                            printf("LISTED %i\n", grid_degrees[g1_i]);
                             for (int p1_i = 1; p1_i <= point_containers[g1_i]->count; p1_i++) {
                                 if (grid_degrees[g1_i] == 0 || point_are_neighbors(full_path->points[0],
                                                                                    point_containers[g1_i]->points[p1_i -
@@ -301,9 +295,6 @@ int main(int argc, char *argv[]) {
                                                         &point_containers[g1_i]->points[p1_i - 1]);
                                     // if d < nn_d
                                     if (d < nn_d) {
-                                        // nn_grid_index = g'-index
-                                        // nn_p = p'
-                                        // nn_d = d
                                         nn_grid_index = g1_i;
                                         nn_p = p1_i;
                                         nn_d = d;
@@ -312,20 +303,6 @@ int main(int argc, char *argv[]) {
                             }
                         }
                     }
-
-                    /// We've got the Nearest neighbor
-//                printf("we got a nearest neighbor \n");
-//                    point *a = &point_containers[g_i]->points[p_to_search[p_i] - 1];
-//                    point *b = &point_containers[nn_grid_index]->points[nn_p - 1];
-//                    printf("connector.put(%i, [%lf %lf;%lf %lf]);\n", NUM_THREADS - degreesLeft(NUM_THREADS), a->x,
-//                           a->y,
-//                           b->x, b->y);
-//
-//                    // if best_selected_point
-//
-//                    for (int i = 0; i < point_containers[g_i]->count; i++) {
-//                        printf("%i -> ", final_paths[g_i][i]);
-//                    }
 
                     point *point_we_are_about_to_add = &(point_containers[g_i]->points[p_to_search[p_i] - 1]);
 
@@ -343,7 +320,6 @@ int main(int argc, char *argv[]) {
                     if (degreesAllEqual2(NUM_THREADS)) {
                         int candidate_city_identifier = get_city_identifier(full_path->points[0],
                                                                             point_containers[nn_grid_index]);
-//                    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, point_containers[nn_grid_index], final_path);
                         int *fake_p_to_search = (int *) malloc(sizeof(int));
                         fake_p_to_search[0] = candidate_city_identifier;
                         add_sub_graph(&full_path, &full_path_index, nn_grid_index, nn_p, fake_p_to_search, 0);
@@ -356,9 +332,7 @@ int main(int argc, char *argv[]) {
                     previous_nn_p = nn_p;
                     g_i = nn_grid_index;
 
-                    // count_p_to_search = get_count_p_to_search(G[nn_grid_index])
                     count_p_to_search = get_count_p_to_search(point_containers[nn_grid_index]);
-                    // p-to-search = get_p_to_search(nn_p, G[nn_grid_index])
                     p_to_search = get_p_to_search(nn_p, point_containers[nn_grid_index], final_paths[nn_grid_index]);
                 }
             }
@@ -369,7 +343,6 @@ int main(int argc, char *argv[]) {
         int point_count = full_path_index - 1;
         full_path->count = point_count;
         for (int i = 0; i < 100; i++) {
-//        printf("INVERSIONS?\n");
             int intersection_count = 0;
             for (int x0 = 0; x0 < point_count - 2; x0++) {
                 int x1 = x0 + 1;
@@ -378,7 +351,6 @@ int main(int argc, char *argv[]) {
                     int y0 = (y_i + x1 + 1) % full_path->count;
                     int y1 = (y0 + 1) % full_path->count;
 
-//            printf("max[%i] %i,%i  -> %i,%i\n", points->count, x0, x1, y0, y1);
                     if (pointsIntersect(full_path->points[x0], full_path->points[x1], full_path->points[y0],
                                         full_path->points[y1])) {
                         handleInversion(&full_path, x1, y0);

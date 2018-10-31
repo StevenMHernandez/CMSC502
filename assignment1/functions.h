@@ -136,10 +136,7 @@ int get_combined_x_y_from_physical(int x, int y, int width) {
 double traveling_salesman(double *distances, int count, int *final_path) {
     // bugfix -> handle when count == 1
     if (count == 0) { return 0; }
-    // bugfix -> handle when count == 2
-//    if (count == 2) { return 2 * distances[1]; }
 
-//    printf("Making %li * sizeof(double)\n", static_cast<long>((1 << count) * count));
     double **c = (double **) malloc(static_cast<long>((1 << count)) * sizeof(double *));
 
     for (int i = 0; i < (1 << count); i++) {
@@ -256,9 +253,6 @@ double *get_distance_matrix(points_container *container) {
     for (int i = 0; i < container->count; i++) {
         for (int j = 0; j < container->count; j++) {
             distances[(j * container->count) + i] = distance(&container->points[i], &container->points[j]);
-//            distances[(j * container->count) + i] = sqrt(pow(container->points[i].x - container->points[j].x, 2) +
-//                                                         pow(container->points[i].y - container->points[j].y, 2));
-//            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
         }
     }
 
@@ -272,8 +266,6 @@ void *run(points_container *container, int *final_path) {
     double *distances = get_distance_matrix(container);
 
     min = traveling_salesman(distances, city_count, final_path);
-
-//    results[rank] = min;
 }
 
 
@@ -292,13 +284,8 @@ int find_index_in_path_for_point(int p_index, points_container *container, int *
  */
 // func next_neighbor_point(p, g):
 int next_neighbor_point(int p_index, points_container *container, int *final_path) {
-//    for (int i = 0; i < container->count; i++) {
-//        printf("%i -> ", final_path[i]);
-//    }
-
     // g[&p + 1 % g->points->count]
     int index_for_current_city = find_index_in_path_for_point(p_index, container, final_path);
-//    printf(" for [%i] which is (%i) next is [%i] which is (%i) \n", index_for_current_city, p_index, (index_for_current_city + 1) % container->count, final_path[(index_for_current_city + 1) % container->count]);
     return final_path[(index_for_current_city + 1) % container->count];
 }
 
@@ -311,15 +298,8 @@ int next_neighbor_point(int p_index, points_container *container, int *final_pat
  */
 // func prev_neighbor_point(p, g):
 int prev_neighbor_point(int p_index, points_container *container, int *final_path) {
-//    for (int i = 0; i < container->count; i++) {
-//        printf("%i -> ", final_path[i]);
-//    }
-
-
     // g[&p - 1 % g->points->count]
     int index_for_current_city = find_index_in_path_for_point(p_index, container, final_path);
-//    int index = find_index_in_path_for_point(p_index, container, final_path);
-//    printf(" for [%i] which is (%i) prev is [%i] which is (%i) \n", index_for_current_city, p_index, (index_for_current_city + (container->count - 1)) % container->count, final_path[(index_for_current_city + (container->count - 1)) % container->count]);
     return final_path[(index_for_current_city + (container->count - 1)) % container->count];
 }
 
@@ -386,39 +366,23 @@ bool point_are_neighbors(point key_point, point candidate_point, points_containe
     return candidate_point_path_index == city_identifier_0 || candidate_point_path_index == city_identifier_1;
 }
 
+int sign(double x) {
+    return static_cast<int>(x / abs(x));
+}
+
+/*
+ * This link explains triangle orientation a bit https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
+ */
 int triangleOrientation(point a, point b, point c) {
-    double val = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
-
-    // colinear
-    if (val == 0) {
-        return 0;
-    }
-
-    // clock or counterclock wise
-    return val > 0 ? 1 : 2;
+    return sign((b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y));
 }
 
 bool pointsIntersect(point a1, point a2, point b1, point b2) {
-    int o1 = triangleOrientation(a1, a2, b1);
-    int o2 = triangleOrientation(a1, a2, b2);
-    int o3 = triangleOrientation(b1, b2, a1);
-    int o4 = triangleOrientation(b1, b2, a2);
-
-    return o1 != o2 && o3 != o4;
-
-//     General case
-//    if (o1 != o2 && o3 != o4) {
-//        return true;
-//    }
-
-    return false;
+    return triangleOrientation(a1, a2, b1) != triangleOrientation(a1, a2, b2) &&
+           triangleOrientation(b1, b2, a1) != triangleOrientation(b1, b2, a2);
 }
 
 void swap_points(points_container **full_path, int a, int b) {
-//    if (a == b) {
-//        printf("WOW They equal\n");
-//    }
-//    printf("swap %i <-> %i\n", a, b);
     point tmp = (*full_path)->points[a];
 
     (*full_path)->points[a] = (*full_path)->points[b];
@@ -426,10 +390,8 @@ void swap_points(points_container **full_path, int a, int b) {
 }
 
 void handleInversion(points_container **full_path, int x1, int y0) {
-//    printf("handle inversion for %i %i\n", x1, y0);
     if (x1 < y0) {
         int range = x1 < y0 ? y0 - x1 : ((*full_path)->count) - x1 + y0;
-//    printf("range2: %i, %i\n", range - (2*floor(range/2)), range);
 
         int path_length = ((*full_path)->count);
 

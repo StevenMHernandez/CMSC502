@@ -104,9 +104,6 @@ double *get_distance_matrix(points_container *container) {
     for (int i = 0; i < container->count; i++) {
         for (int j = 0; j < container->count; j++) {
             distances[(j * container->count) + i] = distance(&container->points[i], &container->points[j]);
-//            distances[(j * container->count) + i] = sqrt(pow(container->points[i].x - container->points[j].x, 2) +
-//                                                         pow(container->points[i].y - container->points[j].y, 2));
-//            printf("distance between %i and %i is %lf\n", i, j, distances[(j * container->count) + i]);
         }
     }
 
@@ -183,10 +180,7 @@ int get_combined_x_y_from_physical(int x, int y, int width) {
 double traveling_salesman(double *distances, int count, int *final_path) {
     // bugfix -> handle when count == 1
     if (count == 0) { return 0; }
-    // bugfix -> handle when count == 2
-//    if (count == 2) { return 2 * distances[1]; }
 
-//    printf("Making %li * sizeof(double)\n", static_cast<long>((1 << count) * count));
     double **c = (double **) malloc(static_cast<long>((1 << count)) * sizeof(double *));
 
     for (int i = 0; i < (1 << count); i++) {
@@ -210,8 +204,6 @@ double traveling_salesman(double *distances, int count, int *final_path) {
                     if (subsets[s_i] & j_bitmask && j != 1) { // check if j∈S
                         // C(S, j) = min{C(S−{j},i)+dij: i∈S, i≠j}
                         double min = INF;
-                        int min_i = 0;
-                        int min_j_bitmask = 0;
 
                         for (int i = 1; i <= count; i++) { // for each C(S−{j},i)+dij
                             int i_bitmask = 1 << (i - 1);
@@ -219,23 +211,12 @@ double traveling_salesman(double *distances, int count, int *final_path) {
                                 int array_position = get_combined_x_y_from_logical(i, j, count);
                                 double distance = c[subsets[s_i] & (~j_bitmask)][i] + distances[array_position];
                                 if (min > distance) {
-                                    min_j_bitmask = j_bitmask;
-                                    min_i = i;
                                     min = distance;
                                 }
                             }
                         }
 
                         c[subsets[s_i]][j] = min;
-
-//                        string previous_bitmask_string = std::bitset<12>(
-//                                static_cast<unsigned long long int>(subsets[s_i] & ~min_j_bitmask)).to_string();
-//                        string x = std::bitset<12>(static_cast<unsigned long long int>((subsets[s_i]))).to_string();
-//                        printf("\n\n    dl[%i][%i] + c[%s][%i]", j, min_i, previous_bitmask_string.c_str(), min_i);
-//                        printf("\n   %lf + %lf = %lf stored at c[%s][%i]",
-//                               distances[get_combined_x_y_from_logical(min_i, j, count)],
-//                               c[subsets[s_i] & ~min_j_bitmask][min_i],
-//                               min, x.c_str(), j);
                     }
                 }
             }
@@ -264,13 +245,11 @@ double traveling_salesman(double *distances, int count, int *final_path) {
     /*
      * Go backwards and determine the path
      */
-//    int *final_path_cities = (int *) malloc((count + 1) * sizeof(int));
 
     final_path[0] = 1;
     // we know the next city because we calculated that just now:
     final_path[1] = min_i;
 
-//    printf("\n hey at least we know [0] -> 0 and [1] -> %i", min_i);
 
     // find each city travelled to
     double current_sum =
@@ -279,36 +258,21 @@ double traveling_salesman(double *distances, int count, int *final_path) {
     // for each city-slot available
     for (int i = 2;
          i <= count; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0] and final_path_cities[1]
-//        printf("\n\n\n");
-//    for (int i = 1; i < count + 1; i++) { // NOTE: skip 1 because we've already added a final_path_cities[0]
         // for each candidate city path taken
         for (int j = 1; j <= count; j++) {
             int x = final_path[i - 1]; // last city travelled to (used to figure out the distances to the current
             int y = j;
             if (x != y) {
                 uint tmp_bitmask = (uint) current_bitmask ^(uint) (1 << (x - 1));
-//                string a_str = std::bitset<12>(static_cast<unsigned long long int>(tmp_bitmask)).to_string();
-//                string sum_str = std::bitset<12>(static_cast<unsigned long long int>(current_bitmask)).to_string();
-//
+
                 double calculated_prev = c[tmp_bitmask][j];
                 double calculated_distance = distances[get_combined_x_y_from_logical(x, y, count)];
                 double calculated_for_current_iteration = calculated_prev + calculated_distance;
 
-//                printf("\nc[%s][%i] + d[%i][%i] = c[%s][%i]\n", a_str.c_str(), j, x, y, sum_str.c_str(), j);
-//                printf("  %lf + %lf", calculated_prev, calculated_distance);
-//                printf(" = %lf", calculated_for_current_iteration);
-//                printf(" ==? %lf ???", current_sum);
-
                 bool is_this_it = abs(calculated_for_current_iteration - current_sum) < 0.000001;
-
-//                if (is_this_it) {
-//                    printf(" YES!!!  <---");
-//                }
 
                 if (is_this_it) {
                     final_path[i] = j;
-//                int x = final_path_cities[i - 1];
-//                int y = final_path_cities[i];
                     current_sum = current_sum - distances[get_combined_x_y_from_logical(x, y, count)];
                     current_bitmask = tmp_bitmask;
                     break;
@@ -351,13 +315,8 @@ int find_index_in_path_for_point(int p_index, points_container *container, int *
  */
 // func next_neighbor_point(p, g):
 int next_neighbor_point(int p_index, points_container *container, int *final_path) {
-//    for (int i = 0; i < container->count; i++) {
-//        printf("%i -> ", final_path[i]);
-//    }
-
     // g[&p + 1 % g->points->count]
     int index_for_current_city = find_index_in_path_for_point(p_index, container, final_path);
-//    printf(" for [%i] which is (%i) next is [%i] which is (%i) \n", index_for_current_city, p_index, (index_for_current_city + 1) % container->count, final_path[(index_for_current_city + 1) % container->count]);
     return final_path[(index_for_current_city + 1) % container->count];
 }
 
@@ -370,15 +329,8 @@ int next_neighbor_point(int p_index, points_container *container, int *final_pat
  */
 // func prev_neighbor_point(p, g):
 int prev_neighbor_point(int p_index, points_container *container, int *final_path) {
-//    for (int i = 0; i < container->count; i++) {
-//        printf("%i -> ", final_path[i]);
-//    }
-
-
     // g[&p - 1 % g->points->count]
     int index_for_current_city = find_index_in_path_for_point(p_index, container, final_path);
-//    int index = find_index_in_path_for_point(p_index, container, final_path);
-//    printf(" for [%i] which is (%i) prev is [%i] which is (%i) \n", index_for_current_city, p_index, (index_for_current_city + (container->count - 1)) % container->count, final_path[(index_for_current_city + (container->count - 1)) % container->count]);
     return final_path[(index_for_current_city + (container->count - 1)) % container->count];
 }
 
@@ -441,13 +393,11 @@ int degreesLeft(int count) {
     int counter = 0;
 
     for (int i = 0; i < count; i++) {
-//        printf("%i ", grid_degrees[i]);
         if (grid_degrees[i] < 2) {
             counter += 1;
         }
     }
 
-    //    printf("   left=%i\n", counter);
     return counter;
 }
 
@@ -481,7 +431,6 @@ bool point_are_neighbors(point key_point, point candidate_point, points_containe
 
 void add_sub_graph(points_container **full_path, int *full_path_index, int g_i, int previous_nn_p, int *p_to_search, int p_i) {
     if (point_containers[g_i]->count > 1) {
-        // printf("{%i} {%i}", p_to_search[1], p_to_search[0]);
         int index_of_initial = find_index_in_path_for_point(previous_nn_p, point_containers[g_i],
                                                             final_paths[g_i]);
 
@@ -499,39 +448,23 @@ void add_sub_graph(points_container **full_path, int *full_path_index, int g_i, 
     }
 }
 
+int sign(double x) {
+    return static_cast<int>(x / abs(x));
+}
+
+/*
+ * This link explains triangle orientation a bit https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
+ */
 int triangleOrientation(point a, point b, point c) {
-    double val = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
-
-    // colinear
-    if (val == 0) {
-        return 0;
-    }
-
-    // clock or counterclock wise
-    return val > 0 ? 1 : 2;
+    return sign((b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y));
 }
 
 bool pointsIntersect(point a1, point a2, point b1, point b2) {
-    int o1 = triangleOrientation(a1, a2, b1);
-    int o2 = triangleOrientation(a1, a2, b2);
-    int o3 = triangleOrientation(b1, b2, a1);
-    int o4 = triangleOrientation(b1, b2, a2);
-
-    return o1 != o2 && o3 != o4;
-
-//     General case
-//    if (o1 != o2 && o3 != o4) {
-//        return true;
-//    }
-
-    return false;
+    return triangleOrientation(a1, a2, b1) != triangleOrientation(a1, a2, b2) &&
+           triangleOrientation(b1, b2, a1) != triangleOrientation(b1, b2, a2);
 }
 
 void swap_points(points_container **full_path, int a, int b) {
-//    if (a == b) {
-//        printf("WOW They equal\n");
-//    }
-//    printf("swap %i <-> %i\n", a, b);
     point tmp = (*full_path)->points[a];
 
     (*full_path)->points[a] = (*full_path)->points[b];
@@ -539,10 +472,8 @@ void swap_points(points_container **full_path, int a, int b) {
 }
 
 void handleInversion(points_container **full_path, int x1, int y0) {
-//    printf("handle inversion for %i %i\n", x1, y0);
     if (x1 < y0) {
         int range = x1 < y0 ? y0 - x1 : ((*full_path)->count) - x1 + y0;
-//    printf("range2: %i, %i\n", range - (2*floor(range/2)), range);
 
         int path_length = ((*full_path)->count);
 
@@ -592,7 +523,6 @@ int main(int argc, char *argv[]) {
     double range_y = max_y - min_y;
     double block_range_y = ceil((range_y + 1) / sqrt(NUM_THREADS));
 
-    // TODO: count how many elements are stored in each grid block so that we can malloc it
     int *block_sizes = (int *) calloc((size_t) NUM_THREADS, sizeof(int));
 
     // count how many points each block should have
@@ -643,8 +573,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < NUM_THREADS; i++) {
         void *result = 0;
         pthread_join(threads[i], NULL);
-
-//        printf("returned to main thread: %lf\n", results[i]);
 
         int *final_path = final_paths[i];
         points_container *p = point_containers[i];
@@ -707,9 +635,6 @@ int main(int argc, char *argv[]) {
                                                     &point_containers[g1_i]->points[p1_i - 1]);
                                 // if d < nn_d
                                 if (d < nn_d) {
-                                    // nn_grid_index = g'-index
-                                    // nn_p = p'
-                                    // nn_d = d
                                     nn_grid_index = g1_i;
                                     nn_p = p1_i;
                                     nn_d = d;
@@ -739,7 +664,6 @@ int main(int argc, char *argv[]) {
                 if (degreesAllEqual2(NUM_THREADS)) {
                     int candidate_city_identifier = get_city_identifier(full_path->points[0],
                                                                         point_containers[nn_grid_index]);
-//                    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, point_containers[nn_grid_index], final_path);
                     int *fake_p_to_search = (int *) malloc(sizeof(int));
                     fake_p_to_search[0] = candidate_city_identifier;
                     add_sub_graph(&full_path, &full_path_index, nn_grid_index, nn_p, fake_p_to_search, 0);
@@ -765,7 +689,6 @@ int main(int argc, char *argv[]) {
     int point_count = full_path_index - 1;
     full_path->count = point_count;
     for (int i = 0; i < 100; i++) {
-//        printf("INVERSIONS?\n");
         int intersection_count = 0;
         for (int x0 = 0; x0 < point_count - 2; x0++) {
             int x1 = x0 + 1;

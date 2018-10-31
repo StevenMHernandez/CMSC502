@@ -77,7 +77,7 @@ void add_sub_graph(points_container **full_path, int *full_path_index, int g_i, 
  *
  */
 
-#define INF DBL_MAX;
+#define INF DBL_MAX
 
 #define POINTS_PER_BLOCK 10
 

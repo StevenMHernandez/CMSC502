@@ -7,8 +7,6 @@
 #include <iostream>
 #include <fstream>
 
-using namespace std;
-
 #define INF DBL_MAX;
 
 /**
@@ -32,9 +30,9 @@ struct points_container {
 int get_file_line_count(char *filename) {
     int count = 0;
 
-    ifstream file(filename);
+    std::ifstream file(filename);
 
-    for (string line; getline(file, line);) {
+    for (std::string line; getline(file, line);) {
         count++;
     }
 
@@ -46,11 +44,11 @@ points_container *get_the_points(char *filename) {
 
     point *points = (point *) malloc(sizeof(point) * line_count);
 
-    ifstream file(filename);
+    std::ifstream file(filename);
 
     int i = 0;
 
-    for (string line; getline(file, line);) {
+    for (std::string line; getline(file, line);) {
         points[i] = point();
 
         double *x = 0, y = 0;

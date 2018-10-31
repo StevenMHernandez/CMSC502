@@ -9,8 +9,6 @@
 #include <mpi.h>
 #include "functions.h"
 
-using namespace std;
-
 /**
  *
  * GLOBAL VAR

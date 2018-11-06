@@ -171,6 +171,22 @@ int main(int argc, char *argv[]) {
 //    free(current_process_point_container);
     current_process_point_container = sorted_point_container;
 
+    /*
+     * Solve for each row
+     */
+    for (int i = 2; i <= blocks_per_dimension; i = i * 2) {
+        if (block_col % i == 0) {
+            // receive message from block_col + (i / 2)
+            printf("%i receives from %i\n", block_col, block_col + (i / 2));
+        } else if (block_col % i == i / 2) {
+            // send message to block_col - (i / 2)
+            printf("%i sends to %i\n", block_col, block_col - (i / 2));
+        }
+    }
+
+    /*
+     * Connect each row
+     */
 
     /**
      * TODO: this is old code clean it up!

@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
             // receive message from rank + ((i / 2) * blocks_per_dimension)
             int source = rank + ((i / 2) * blocks_per_dimension);
 
-            if (source % blocks_per_dimension > block_row) { // if source doesn't exist, we don't want to cause a deadlock!
+            if (source < total_tasks) { // if source doesn't exist, we don't want to cause a deadlock!
                 int num_points_receiving;
                 MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i, communicator, &stat);
 

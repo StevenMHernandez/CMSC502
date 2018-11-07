@@ -303,7 +303,7 @@ int main(int argc, char *argv[]) {
 
     if (rank == 0) {
         clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-        uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
+        uint64_t diff = static_cast<uint64_t>((1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6);
         //* Print the time take for the given number of processors used and number of cities total
         //* Format: "identifier,num processors,num cities,time(ms)"
         printf("time_taken_ms,%i,%i,%llu\n", total_tasks, current_process_point_container->count, diff);

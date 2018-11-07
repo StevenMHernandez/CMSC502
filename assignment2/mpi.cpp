@@ -211,8 +211,8 @@ int main(int argc, char *argv[]) {
      */
     for (int i = 2; i <= blocks_per_dimension; i = i * 2) {
         if (block_row % i == 0) {
-            // receive message from rank + ((i / 2) * 2)
-            int source = rank + ((i / 2) * 2);
+            // receive message from rank + ((i / 2) * blocks_per_dimension)
+            int source = rank + ((i / 2) * blocks_per_dimension);
 
             double *values = (double *) malloc(current_process_point_container->count * 2 * sizeof(double));
             MPI_Recv(values, current_process_point_container->count * 2, MPI_DOUBLE, source, i, communicator, &stat);
@@ -221,8 +221,9 @@ int main(int argc, char *argv[]) {
             // merge
             current_process_point_container = merge_and_create(*current_process_point_container, *received);
         } else if (block_row % i == i / 2) {
-            // send message to rank - ((i / 2) * 2)
-            int destination = rank - ((i / 2) * 2);
+            // send message to rank - ((i / 2) * blocks_per_dimension)
+            int destination = rank - ((i / 2) * blocks_per_dimension);
+
             double *points_extrapolated = created_double_array_from(*current_process_point_container);
             MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i, communicator);
         }

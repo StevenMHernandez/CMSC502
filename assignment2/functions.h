@@ -108,7 +108,7 @@ void combinations(int *arr, int size, int distances_count, int *index, int bit_p
 }
 
 int *get_subsets_of_size(int size, int distances_count) {
-    int *subsets = (int *) calloc(count_of_subsets_of_size(size, distances_count), sizeof(int *));
+    int *subsets = (int *) calloc(count_of_subsets_of_size(size, distances_count), sizeof(int));
     int index = 0;
     combinations(subsets, size, distances_count, &index, 0, 0, 0);
     return subsets;

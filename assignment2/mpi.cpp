@@ -70,7 +70,8 @@ points_container *merge_and_create(points_container &current, points_container &
         for (int recv_i = 0; recv_i < current.count; recv_i++) {
             int subsequent_curr_i = (curr_i + 1) % current.count;
             int subsequent_recv_i = (recv_i + 1) % received.count;
-            double cost = swapCost(&current.points[curr_i], &current.points[subsequent_curr_i], &received.points[recv_i], &received.points[subsequent_recv_i]);
+            double cost = swapCost(&current.points[curr_i], &current.points[subsequent_curr_i],
+                                   &received.points[recv_i], &received.points[subsequent_recv_i]);
 
             if (cost < min) {
                 min = cost;
@@ -80,19 +81,50 @@ points_container *merge_and_create(points_container &current, points_container &
         }
     }
 
-    // TODO: figure out if the method selected here is actually the best one! (Hint: its not!)
+    int min_subsequent_curr_i = (min_curr_i + 1) % current.count;
+    int min_subsequent_recv_i = (min_recv_i + 1) % received.count;
+
+    double distance_of_first_pairing_option = distance(&current.points[min_curr_i],
+                                                       &received.points[min_recv_i])
+                                              + distance(&current.points[min_subsequent_curr_i],
+                                                         &received.points[min_subsequent_recv_i]);
+
+    double distance_of_second_pairing_option = distance(&current.points[min_curr_i],
+                                                        &received.points[min_subsequent_recv_i])
+                                               + distance(&current.points[min_subsequent_curr_i],
+                                                          &received.points[min_recv_i]);
+
+    bool should_reverse = distance_of_first_pairing_option < distance_of_second_pairing_option;
+
     int counter = 0;
-    for (int i = 0; i <= min_curr_i; i++) {
-        merged->points[counter++] = current.points[i];
-    }
-    for (int i = min_recv_i + 1; i < received.count ; i++) {
-        merged->points[counter++] = received.points[i];
-    }
-    for (int i = 0; i <= min_recv_i; i++) {
-        merged->points[counter++] = received.points[i];
-    }
-    for (int i = min_curr_i + 1; i < current.count ; i++) {
-        merged->points[counter++] = current.points[i];
+    if (should_reverse) {
+        for (int i = 0; i <= min_curr_i; i++) {
+            merged->points[counter++] = current.points[i];
+        }
+        for (int i = min_recv_i; i >= 0; i--) {
+            merged->points[counter++] = received.points[i];
+        }
+
+        for (int i = received.count - 1; i > min_recv_i; i--) {
+            merged->points[counter++] = received.points[i];
+        }
+        for (int i = min_curr_i + 1; i < current.count; i++) {
+            merged->points[counter++] = current.points[i];
+        }
+    } else {
+        for (int i = current.count - 1; i > min_curr_i; i--) {
+            merged->points[counter++] = current.points[i];
+        }
+        for (int i = min_recv_i; i >= 0; i--) {
+            merged->points[counter++] = received.points[i];
+        }
+
+        for (int i = received.count - 1; i > min_recv_i; i--) {
+            merged->points[counter++] = received.points[i];
+        }
+        for (int i = min_curr_i; i >= 0; i--) {
+            merged->points[counter++] = current.points[i];
+        }
     }
 
     return merged;
@@ -116,7 +148,7 @@ points_container *merge_and_create(points_container &current, points_container &
 int main(int argc, char *argv[]) {
     int rank, total_tasks;
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &total_tasks); // This will need to be a square number such that y = \sqrt(x) where x and y are positive integers.
+    MPI_Comm_size(MPI_COMM_WORLD, &total_tasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Status stat;
     points_container *current_process_point_container;
@@ -134,7 +166,7 @@ int main(int argc, char *argv[]) {
     /// Use the MPI Cartesian Topology
     MPI_Comm communicator;
     int dim_size[2] = {blocks_per_dimension, blocks_per_dimension};
-    int periods[2] = {0,0};
+    int periods[2] = {0, 0};
     int ierr = MPI_Cart_create(MPI_COMM_WORLD, 2, dim_size, periods, 0, &communicator);
 
     // Calculate row by row starting from the bottom left
@@ -171,12 +203,13 @@ int main(int argc, char *argv[]) {
     sorted_point_container->count = POINTS_PER_BLOCK;
     sorted_point_container->points = (point *) malloc(POINTS_PER_BLOCK * sizeof(point));
     for (int i = 0; i < POINTS_PER_BLOCK; i++) {
-        sorted_point_container->points[i] = current_process_point_container->points[current_processes_final_path[i] - 1];
+        int index = current_processes_final_path[i] - 1;
+        sorted_point_container->points[i] = current_process_point_container->points[index];
         point *p = &(sorted_point_container->points[i]);
 
         //* Print the points selected in order as selected by the TSP
         //* Format: "identifier,rank,x,y"
-        printf("sub_tsp_path,%i,%lf,%lf\n",rank, (*p).x, (*p).y);
+        printf("sub_tsp_path,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
     }
 //    free(current_processes_final_path);
 //    free(current_process_point_container);
@@ -200,7 +233,8 @@ int main(int argc, char *argv[]) {
             // send message to rank - (i / 2)
             int destination = rank - (i / 2);
             double *points_extrapolated = created_double_array_from(*current_process_point_container);
-            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i, communicator);
+            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i,
+                     communicator);
         }
 
         MPI_Barrier(communicator);
@@ -225,7 +259,8 @@ int main(int argc, char *argv[]) {
             int destination = rank - ((i / 2) * blocks_per_dimension);
 
             double *points_extrapolated = created_double_array_from(*current_process_point_container);
-            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i, communicator);
+            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i,
+                     communicator);
         }
 
         MPI_Barrier(communicator);
@@ -240,6 +275,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-     MPI_Finalize();
-     return 0;
+    MPI_Finalize();
+    return 0;
 }

@@ -274,6 +274,8 @@ int main(int argc, char *argv[]) {
             // send message to rank - ((i / 2) * blocks_per_dimension)
             int destination = rank - ((i / 2) * blocks_per_dimension);
 
+            MPI_Send(&current_process_point_container->count, 1, MPI_INT, destination, i, communicator);
+
             double *points_extrapolated = created_double_array_from(*current_process_point_container);
             MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i,
                      communicator);

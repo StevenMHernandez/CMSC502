@@ -4,4 +4,4 @@ make clean
 
 make mpi
 
-mpirun -np 4 ./mpi
+mpirun -np 36 ./mpi

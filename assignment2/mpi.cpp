@@ -155,9 +155,13 @@ int main(int argc, char *argv[]) {
     int *current_processes_final_path;
     srandom(rank);
 
-    points_container *points;
-
     struct timespec start, end;
+
+    if (rank == 0) {
+        clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+    }
+
+    points_container *points;
 
     int NUM_THREADS = total_tasks;
 
@@ -291,6 +295,12 @@ int main(int argc, char *argv[]) {
             //* Format: "identifier,rank,x,y"
             printf("merged_all,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
         }
+    }
+
+    if (rank == 0) {
+        clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+        uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
+        printf("time_taken_ms,%llu\n", diff);
     }
 
     MPI_Finalize();

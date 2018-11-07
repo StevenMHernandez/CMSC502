@@ -292,12 +292,34 @@ int main(int argc, char *argv[]) {
         MPI_Barrier(communicator);
     }
 
+    if (rank == 0) {
+        // handle inversions
+        int point_count = current_process_point_container->count;
+        for (int i = 0; i < 100; i++) {
+            int intersection_count = 0;
+            for (int x0 = 0; x0 < point_count - 2; x0++) {
+                int x1 = x0 + 1;
+
+                for (int y_i = 0; y_i < point_count - 1 - 2; y_i++) {
+                    int y0 = (y_i + x1 + 1) % current_process_point_container->count;
+                    int y1 = (y0 + 1) % current_process_point_container->count;
+
+                    if (pointsIntersect(current_process_point_container->points[x0], current_process_point_container->points[x1], current_process_point_container->points[y0],
+                                        current_process_point_container->points[y1])) {
+                        handleInversion(&current_process_point_container, x1, y0);
+                        intersection_count++;
+                    }
+                }
+            }
+        }
+    }
+
     if (block_col == 0 && block_row == 0) {
         for (int i = 0; i < current_process_point_container->count; i++) {
             point *p = &(current_process_point_container->points[i]);
             //* Print the points after being merged across the row
             //* Format: "identifier,rank,x,y"
-            //printf("merged_all,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
+            printf("merged_all,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
         }
     }
 

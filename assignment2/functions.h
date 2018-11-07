@@ -73,8 +73,8 @@ double distance(point *a, point *b) {
     return sqrt(pow(a->x - b->x, 2) + pow(a->y - b->y, 2));
 }
 
-int combinations_calculation(int n, int k) {
-    int result = n;
+uint combinations_calculation(int n, int k) {
+    uint result = (uint) n;
     for (int i = 2; i <= k; ++i) {
         result *= (n - i + 1);
         result /= i;
@@ -82,7 +82,7 @@ int combinations_calculation(int n, int k) {
     return result;
 }
 
-int count_of_subsets_of_size(int size, int distances_count) {
+uint count_of_subsets_of_size(int size, int distances_count) {
     return combinations_calculation(distances_count, size);
 }
 
@@ -139,7 +139,8 @@ double traveling_salesman(double *distances, int count, int *final_path) {
     double **c = (double **) malloc(static_cast<long>((1 << count)) * sizeof(double *));
 
     for (int i = 0; i < (1 << count); i++) {
-        c[i] = (double *) calloc(count + 1, sizeof(double));
+        c[i] = (double *) malloc((count + 1) * sizeof(double));
+        memset(c[i], 999, (count + 1) * sizeof(double));
     }
 
     // C({1},1) = 0
@@ -209,8 +210,7 @@ double traveling_salesman(double *distances, int count, int *final_path) {
 //    printf("\n hey at least we know [0] -> 0 and [1] -> %i", min_i);
 
     // find each city travelled to
-    double current_sum =
-            min - distances[get_combined_x_y_from_logical(final_path[0], final_path[1], count)];
+    double current_sum = min - distances[get_combined_x_y_from_logical(final_path[0], final_path[1], count)];
     uint current_bitmask = full_bitmask;
     // for each city-slot available
     for (int i = 2;
@@ -224,11 +224,11 @@ double traveling_salesman(double *distances, int count, int *final_path) {
                 double calculated_prev = c[tmp_bitmask][j];
                 double calculated_distance = distances[get_combined_x_y_from_logical(x, y, count)];
                 double calculated_for_current_iteration = calculated_prev + calculated_distance;
-                bool is_this_it = calculated_for_current_iteration != INF && abs(calculated_for_current_iteration - current_sum) < 0.000001;
+                bool is_this_it = calculated_for_current_iteration != INF && abs(calculated_for_current_iteration - current_sum) < 0.000001; // TODO: still consider changing this threshold
 
                 if (is_this_it) {
                     final_path[i] = j;
-                    current_sum = current_sum - distances[get_combined_x_y_from_logical(x, y, count)];
+                    current_sum = calculated_prev;
                     current_bitmask = tmp_bitmask;
                     break;
                 }
@@ -258,13 +258,13 @@ double *get_distance_matrix(points_container *container) {
     return distances;
 }
 
-void *run_tsp(points_container *container, int *final_path) {
+void run_tsp(points_container *container, int *final_path) {
     int city_count = container->count;
 
     double min = 0;
     double *distances = get_distance_matrix(container);
 
-    min = traveling_salesman(distances, city_count, final_path);
+    traveling_salesman(distances, city_count, final_path);
 }
 
 

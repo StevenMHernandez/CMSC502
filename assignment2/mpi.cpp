@@ -215,23 +215,34 @@ int main(int argc, char *argv[]) {
 //    free(current_process_point_container);
     current_process_point_container = sorted_point_container;
 
+    // Because we might not have dimensions which are perfect squares
+    int num_times_to_merge_per_dim = (int) pow(2, ceil(log2(blocks_per_dimension)));
+
     /*
      * Merge Columns per Row
      */
-    for (int i = 2; i <= blocks_per_dimension; i = i * 2) {
+    for (int i = 2; i <= num_times_to_merge_per_dim; i = i * 2) {
         if (block_col % i == 0) {
             // receive message from rank + (i / 2)
             int source = rank + (i / 2);
 
-            double *values = (double *) malloc(current_process_point_container->count * 2 * sizeof(double));
-            MPI_Recv(values, current_process_point_container->count * 2, MPI_DOUBLE, source, i, communicator, &stat);
-            points_container *received = create_points_container_from(values, current_process_point_container->count);
+            if (source < blocks_per_dimension) { // if source doesn't exist, we don't want to cause a deadlock!
+                int num_points_receiving;
+                MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i, communicator, &stat);
 
-            // merge
-            current_process_point_container = merge_and_create(*current_process_point_container, *received);
+                double *values = (double *) malloc(num_points_receiving * 2 * sizeof(double));
+                MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i, communicator, &stat);
+                points_container *received = create_points_container_from(values, num_points_receiving);
+
+                // merge
+                current_process_point_container = merge_and_create(*current_process_point_container, *received);
+            }
         } else if (block_col % i == i / 2) {
             // send message to rank - (i / 2)
             int destination = rank - (i / 2);
+
+            MPI_Send(&current_process_point_container->count, 1, MPI_INT, destination, i, communicator);
+
             double *points_extrapolated = created_double_array_from(*current_process_point_container);
             MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i,
                      communicator);
@@ -243,17 +254,22 @@ int main(int argc, char *argv[]) {
     /*
      * Merge Rows
      */
-    for (int i = 2; i <= blocks_per_dimension; i = i * 2) {
+    for (int i = 2; i <= num_times_to_merge_per_dim; i = i * 2) {
         if (block_row % i == 0) {
             // receive message from rank + ((i / 2) * blocks_per_dimension)
             int source = rank + ((i / 2) * blocks_per_dimension);
 
-            double *values = (double *) malloc(current_process_point_container->count * 2 * sizeof(double));
-            MPI_Recv(values, current_process_point_container->count * 2, MPI_DOUBLE, source, i, communicator, &stat);
-            points_container *received = create_points_container_from(values, current_process_point_container->count);
+            if (source < blocks_per_dimension) { // if source doesn't exist, we don't want to cause a deadlock!
+                int num_points_receiving;
+                MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i, communicator, &stat);
 
-            // merge
-            current_process_point_container = merge_and_create(*current_process_point_container, *received);
+                double *values = (double *) malloc(num_points_receiving * 2 * sizeof(double));
+                MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i, communicator, &stat);
+                points_container *received = create_points_container_from(values, num_points_receiving);
+
+                // merge
+                current_process_point_container = merge_and_create(*current_process_point_container, *received);
+            }
         } else if (block_row % i == i / 2) {
             // send message to rank - ((i / 2) * blocks_per_dimension)
             int destination = rank - ((i / 2) * blocks_per_dimension);

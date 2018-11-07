@@ -67,7 +67,7 @@ points_container *merge_and_create(points_container &current, points_container &
     int min_recv_i = 0;
 
     for (int curr_i = 0; curr_i < current.count; curr_i++) {
-        for (int recv_i = 0; recv_i < current.count; recv_i++) {
+        for (int recv_i = 0; recv_i < received.count; recv_i++) {
             int subsequent_curr_i = (curr_i + 1) % current.count;
             int subsequent_recv_i = (recv_i + 1) % received.count;
             double cost = swapCost(&current.points[curr_i], &current.points[subsequent_curr_i],
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
             // receive message from rank + (i / 2)
             int source = rank + (i / 2);
 
-            if (source < blocks_per_dimension) { // if source doesn't exist, we don't want to cause a deadlock!
+            if (source % blocks_per_dimension > block_col) { // if source doesn't exist, we don't want to cause a deadlock!
                 int num_points_receiving;
                 MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i, communicator, &stat);
 
@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
             // receive message from rank + ((i / 2) * blocks_per_dimension)
             int source = rank + ((i / 2) * blocks_per_dimension);
 
-            if (source < blocks_per_dimension) { // if source doesn't exist, we don't want to cause a deadlock!
+            if (source % blocks_per_dimension > block_row) { // if source doesn't exist, we don't want to cause a deadlock!
                 int num_points_receiving;
                 MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i, communicator, &stat);
 

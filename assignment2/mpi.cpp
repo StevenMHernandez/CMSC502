@@ -304,7 +304,9 @@ int main(int argc, char *argv[]) {
                     int y0 = (y_i + x1 + 1) % current_process_point_container->count;
                     int y1 = (y0 + 1) % current_process_point_container->count;
 
-                    if (pointsIntersect(current_process_point_container->points[x0], current_process_point_container->points[x1], current_process_point_container->points[y0],
+                    if (pointsIntersect(current_process_point_container->points[x0],
+                                        current_process_point_container->points[x1],
+                                        current_process_point_container->points[y0],
                                         current_process_point_container->points[y1])) {
                         handleInversion(&current_process_point_container, x1, y0);
                         intersection_count++;
@@ -319,15 +321,29 @@ int main(int argc, char *argv[]) {
             point *p = &(current_process_point_container->points[i]);
             //* Print the points after being merged across the row
             //* Format: "identifier,rank,x,y"
-            printf("merged_all,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
+            //printf("merged_all,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
         }
     }
 
     if (rank == 0) {
+        double total_distance = 0;
+
+        for (int i = 1; i < current_process_point_container->count; i++) {
+            total_distance += distance(&current_process_point_container->points[i - 1],
+                                       &current_process_point_container->points[i]);
+
+        }
+        total_distance += distance(&current_process_point_container->points[current_process_point_container->count - 1],
+                                   &current_process_point_container->points[0]);
+
+        //* Print the length of the TSP for the given number of processors and the number of cities per processor
+        //* Format: "identifier,num processors,num cities,time(ms)"
+        printf("tsp_length,%i,%i,%lf\n", total_tasks, current_process_point_container->count, total_distance);
+
         clock_gettime(CLOCK_MONOTONIC_RAW, &end);
         //* Print the time take for the given number of processors used and number of cities total
         //* Format: "identifier,num processors,num cities,time(ms)"
-        printf("time_taken_ms,%i,%i,%lf\n", total_tasks, current_process_point_container->count, (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6);
+//        printf("time_taken_ms,%i,%i,%lf\n", total_tasks, current_process_point_container->count, (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6);
     }
 
     MPI_Finalize();

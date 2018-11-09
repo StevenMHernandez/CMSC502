@@ -295,8 +295,9 @@ int main(int argc, char *argv[]) {
     if (rank == 0) {
         // handle inversions
         int point_count = current_process_point_container->count;
-        for (int i = 0; i < 100; i++) {
-            int intersection_count = 0;
+        int intersection_count = 1;
+        while (intersection_count > 0) {
+            intersection_count = 0;
             for (int x0 = 0; x0 < point_count - 2; x0++) {
                 int x1 = x0 + 1;
 
@@ -338,12 +339,12 @@ int main(int argc, char *argv[]) {
 
         //* Print the length of the TSP for the given number of processors and the number of cities per processor
         //* Format: "identifier,num processors,num cities,time(ms)"
-        printf("tsp_length,%i,%i,%lf\n", total_tasks, current_process_point_container->count, total_distance);
+//        printf("tsp_length,%i,%i,%lf\n", total_tasks, current_process_point_container->count, total_distance);
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &end);
         //* Print the time take for the given number of processors used and number of cities total
         //* Format: "identifier,num processors,num cities,time(ms)"
-//        printf("time_taken_ms,%i,%i,%lf\n", total_tasks, current_process_point_container->count, (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6);
+        printf("time_taken_ms,%i,%i,%lf\n", total_tasks, current_process_point_container->count, (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6);
     }
 
     MPI_Finalize();

@@ -28,47 +28,6 @@ struct points_container {
     point *points;
 };
 
-int get_file_line_count(char *filename) {
-    int count = 0;
-
-    std::ifstream file(filename);
-
-    for (std::string line; getline(file, line);) {
-        count++;
-    }
-
-    return count;
-}
-
-points_container *get_the_points(char *filename) {
-    int line_count = get_file_line_count(filename);
-
-    point *points = (point *) malloc(sizeof(point) * line_count);
-
-    std::ifstream file(filename);
-
-    int i = 0;
-
-    for (std::string line; getline(file, line);) {
-        points[i] = point();
-
-        double *x = 0, y = 0;
-
-        char *line_chars = const_cast<char *>(line.c_str());
-
-        sscanf(line_chars, "%lf %lf", &points[i].x, &points[i].y);
-
-        i++;
-    }
-
-    points_container *container = (points_container *) malloc(sizeof(points_container));
-
-    container->count = line_count;
-    container->points = points;
-
-    return container;
-}
-
 double distance(point *a, point *b) {
     return sqrt(pow(a->x - b->x, 2) + pow(a->y - b->y, 2));
 }
@@ -123,13 +82,6 @@ int *get_subsets_of_size(int size, int distances_count) {
  */
 int get_combined_x_y_from_logical(int x, int y, int width) {
     return (y - 1) * width + (x - 1);
-}
-
-/*
- * This function gets the array-index from distances[][] as _physical 0-based numbering_
- */
-int get_combined_x_y_from_physical(int x, int y, int width) {
-    return y * width + x;
 }
 
 double traveling_salesman(double *distances, int count, int *final_path) {
@@ -267,104 +219,6 @@ void run_tsp(points_container *container, int *final_path) {
     double *distances = get_distance_matrix(container);
 
     traveling_salesman(distances, city_count, final_path);
-}
-
-
-int find_index_in_path_for_point(int p_index, points_container *container, int *final_path) {
-    for (int i = 0; i < container->count; i++) {
-        if ((p_index) == final_path[i]) {
-            return i;
-        }
-    }
-
-    return -1; // this should never occur
-}
-
-/*
- * p_index is actually the city-identifier! (which is 1-based)
- */
-// func next_neighbor_point(p, g):
-int next_neighbor_point(int p_index, points_container *container, int *final_path) {
-    // g[&p + 1 % g->points->count]
-    int index_for_current_city = find_index_in_path_for_point(p_index, container, final_path);
-    return final_path[(index_for_current_city + 1) % container->count];
-}
-
-/**
- *
- * @param p_index this is the index for the point from the container
- * @param container
- * @param final_path
- * @return
- */
-// func prev_neighbor_point(p, g):
-int prev_neighbor_point(int p_index, points_container *container, int *final_path) {
-    // g[&p - 1 % g->points->count]
-    int index_for_current_city = find_index_in_path_for_point(p_index, container, final_path);
-    return final_path[(index_for_current_city + (container->count - 1)) % container->count];
-}
-
-
-int get_count_p_to_search(points_container *container) {
-    if (container->count == 1 || container->count == 2) {
-        return 1;
-    }
-
-    return 2;
-}
-
-/**
- *
- * @param p_index this is the index for the point from the container
- * @param container
- * @param final_path
- * @return
- */
-// nn_p, &point_containers[nn_grid_index], final_paths[nn_grid_index]
-int *get_p_to_search(int p_index, points_container *container, int *final_path) {
-    int *result = (int *) malloc(get_count_p_to_search(container) * sizeof(int));
-
-    // if g->points->count == 1:
-    if (container->count == 1) {
-        // return [p]
-        result[0] = p_index;
-    } else if (container->count == 2) {
-        // return [next_neighbor_point(p)];
-        result[0] = next_neighbor_point(p_index, container, final_path);
-    } else {
-        result[0] = next_neighbor_point(p_index, container, final_path);
-        result[1] = prev_neighbor_point(p_index, container, final_path);
-    }
-
-    return result;
-}
-
-bool are_these_points_the_same(point a, point b) {
-    return a.x == b.x && a.y == b.y;
-}
-
-int get_city_identifier(point p, points_container *container) {
-    int city_identifier = -1;
-
-    for (int i = 0; i < container->count; i++) {
-        if (p.x == container->points[i].x && p.y == container->points[i].y) {
-            city_identifier = i + 1;
-        }
-    }
-
-    return city_identifier;
-}
-
-bool point_are_neighbors(point key_point, point candidate_point, points_container *container, int *path) {
-    int city_identifier = get_city_identifier(key_point, container);
-    int candidate_city_identifier = get_city_identifier(candidate_point, container);
-
-    int city_identifier_0 = prev_neighbor_point(city_identifier, container, path);
-    int city_identifier_1 = next_neighbor_point(city_identifier, container, path);
-
-    int candidate_point_path_index = find_index_in_path_for_point(candidate_city_identifier, container, path);
-
-    return candidate_point_path_index == city_identifier_0 || candidate_point_path_index == city_identifier_1;
 }
 
 int sign(double x) {

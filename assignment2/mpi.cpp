@@ -296,6 +296,7 @@ int main(int argc, char *argv[]) {
         // handle inversions
         int point_count = current_process_point_container->count;
         int intersection_count = 1;
+        int counter = 0;
         while (intersection_count > 0) {
             intersection_count = 0;
             for (int x0 = 0; x0 < point_count - 2; x0++) {
@@ -313,6 +314,10 @@ int main(int argc, char *argv[]) {
                         intersection_count++;
                     }
                 }
+            }
+            counter++;
+            if (counter == 100) {
+                break;
             }
         }
     }

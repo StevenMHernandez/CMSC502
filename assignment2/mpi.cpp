@@ -130,6 +130,35 @@ points_container *merge_and_create(points_container &current, points_container &
     return merged;
 }
 
+void handleInversions(points_container *container) {
+    int point_count = container->count;
+    int intersection_count = 1;
+    int counter = 0;
+    while (intersection_count > 0) {
+        intersection_count = 0;
+        for (int x0 = 0; x0 < point_count - 2; x0++) {
+            int x1 = x0 + 1;
+
+            for (int y_i = 0; y_i < point_count - 1 - 2; y_i++) {
+                int y0 = (y_i + x1 + 1) % container->count;
+                int y1 = (y0 + 1) % container->count;
+
+                if (pointsIntersect(container->points[x0],
+                                    container->points[x1],
+                                    container->points[y0],
+                                    container->points[y1])) {
+                    handleInversion(&container, x1, y0);
+                    intersection_count++;
+                }
+            }
+        }
+        counter++;
+        if (counter == 100) {
+            break;
+        }
+    }
+}
+
 /**
  *
  * Traveling Salesman Algorithm
@@ -244,6 +273,7 @@ int main(int argc, char *argv[]) {
 
                 // merge
                 current_process_point_container = merge_and_create(*current_process_point_container, *received);
+                handleInversions(current_process_point_container);
             }
         } else if (block_col % i == i / 2) {
             // send message to rank - (i / 2)
@@ -277,6 +307,7 @@ int main(int argc, char *argv[]) {
 
                 // merge
                 current_process_point_container = merge_and_create(*current_process_point_container, *received);
+                handleInversions(current_process_point_container);
             }
         } else if (block_row % i == i / 2) {
             // send message to rank - ((i / 2) * blocks_per_dimension)
@@ -290,36 +321,6 @@ int main(int argc, char *argv[]) {
         }
 
         MPI_Barrier(communicator);
-    }
-
-    if (rank == 0) {
-        // handle inversions
-        int point_count = current_process_point_container->count;
-        int intersection_count = 1;
-        int counter = 0;
-        while (intersection_count > 0) {
-            intersection_count = 0;
-            for (int x0 = 0; x0 < point_count - 2; x0++) {
-                int x1 = x0 + 1;
-
-                for (int y_i = 0; y_i < point_count - 1 - 2; y_i++) {
-                    int y0 = (y_i + x1 + 1) % current_process_point_container->count;
-                    int y1 = (y0 + 1) % current_process_point_container->count;
-
-                    if (pointsIntersect(current_process_point_container->points[x0],
-                                        current_process_point_container->points[x1],
-                                        current_process_point_container->points[y0],
-                                        current_process_point_container->points[y1])) {
-                        handleInversion(&current_process_point_container, x1, y0);
-                        intersection_count++;
-                    }
-                }
-            }
-            counter++;
-            if (counter == 100) {
-                break;
-            }
-        }
     }
 
     if (block_col == 0 && block_row == 0) {
@@ -344,7 +345,7 @@ int main(int argc, char *argv[]) {
 
         //* Print the length of the TSP for the given number of processors and the number of cities per processor
         //* Format: "identifier,num processors,num cities,time(ms)"
-//        printf("tsp_length,%i,%i,%lf\n", total_tasks, current_process_point_container->count, total_distance);
+        printf("tsp_length,%i,%i,%lf\n", total_tasks, current_process_point_container->count, total_distance);
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &end);
         //* Print the time take for the given number of processors used and number of cities total

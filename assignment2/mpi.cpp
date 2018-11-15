@@ -258,6 +258,7 @@ int main(int argc, char *argv[]) {
     /*
      * Merge Columns per Row
      */
+    int tagOffset = total_tasks;
     for (int i = 2; i <= num_times_to_merge_per_dim; i = i * 2) {
         if (block_col % i == 0) {
             // receive message from rank + (i / 2)
@@ -265,10 +266,10 @@ int main(int argc, char *argv[]) {
 
             if (source % blocks_per_dimension > block_col) { // if source doesn't exist, we don't want to cause a deadlock!
                 int num_points_receiving;
-                MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i, communicator, &stat);
+                MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i + tagOffset, communicator, &stat);
 
                 double *values = (double *) malloc(num_points_receiving * 2 * sizeof(double));
-                MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i, communicator, &stat);
+                MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i + tagOffset, communicator, &stat);
                 points_container *received = create_points_container_from(values, num_points_receiving);
 
                 // merge
@@ -279,19 +280,18 @@ int main(int argc, char *argv[]) {
             // send message to rank - (i / 2)
             int destination = rank - (i / 2);
 
-            MPI_Send(&current_process_point_container->count, 1, MPI_INT, destination, i, communicator);
+            MPI_Send(&current_process_point_container->count, 1, MPI_INT, destination, i + tagOffset, communicator);
 
             double *points_extrapolated = created_double_array_from(*current_process_point_container);
-            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i,
+            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i + tagOffset,
                      communicator);
         }
-
-        MPI_Barrier(communicator);
     }
 
     /*
      * Merge Rows
      */
+    tagOffset = (2 * total_tasks);
     for (int i = 2; i <= num_times_to_merge_per_dim; i = i * 2) {
         if (block_row % i == 0) {
             // receive message from rank + ((i / 2) * blocks_per_dimension)
@@ -299,10 +299,10 @@ int main(int argc, char *argv[]) {
 
             if (source < total_tasks) { // if source doesn't exist, we don't want to cause a deadlock!
                 int num_points_receiving;
-                MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i, communicator, &stat);
+                MPI_Recv(&num_points_receiving, 1, MPI_INT, source, i + tagOffset, communicator, &stat);
 
                 double *values = (double *) malloc(num_points_receiving * 2 * sizeof(double));
-                MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i, communicator, &stat);
+                MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i + tagOffset, communicator, &stat);
                 points_container *received = create_points_container_from(values, num_points_receiving);
 
                 // merge
@@ -313,14 +313,12 @@ int main(int argc, char *argv[]) {
             // send message to rank - ((i / 2) * blocks_per_dimension)
             int destination = rank - ((i / 2) * blocks_per_dimension);
 
-            MPI_Send(&current_process_point_container->count, 1, MPI_INT, destination, i, communicator);
+            MPI_Send(&current_process_point_container->count, 1, MPI_INT, destination, i + tagOffset, communicator);
 
             double *points_extrapolated = created_double_array_from(*current_process_point_container);
-            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i,
+            MPI_Send(points_extrapolated, current_process_point_container->count * 2, MPI_DOUBLE, destination, i + tagOffset,
                      communicator);
         }
-
-        MPI_Barrier(communicator);
     }
 
     if (block_col == 0 && block_row == 0) {

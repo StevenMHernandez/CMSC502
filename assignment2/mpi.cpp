@@ -127,6 +127,11 @@ points_container *merge_and_create(points_container &current, points_container &
         }
     }
 
+    free(current.points);
+    free(&current);
+    free(received.points);
+    free(&received);
+
     return merged;
 }
 
@@ -248,8 +253,9 @@ int main(int argc, char *argv[]) {
         //* Format: "identifier,rank,x,y"
         //printf("sub_tsp_path,%i,%lf,%lf\n", rank, (*p).x, (*p).y);
     }
-//    free(current_processes_final_path);
-//    free(current_process_point_container);
+    free(current_processes_final_path);
+    free(current_process_point_container->points);
+    free(current_process_point_container);
     current_process_point_container = sorted_point_container;
 
     // Because we might not have dimensions which are perfect squares
@@ -271,6 +277,7 @@ int main(int argc, char *argv[]) {
                 double *values = (double *) malloc(num_points_receiving * 2 * sizeof(double));
                 MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i + tagOffset, communicator, &stat);
                 points_container *received = create_points_container_from(values, num_points_receiving);
+                free(values);
 
                 // merge
                 current_process_point_container = merge_and_create(*current_process_point_container, *received);
@@ -304,6 +311,7 @@ int main(int argc, char *argv[]) {
                 double *values = (double *) malloc(num_points_receiving * 2 * sizeof(double));
                 MPI_Recv(values, num_points_receiving * 2, MPI_DOUBLE, source, i + tagOffset, communicator, &stat);
                 points_container *received = create_points_container_from(values, num_points_receiving);
+                free(values);
 
                 // merge
                 current_process_point_container = merge_and_create(*current_process_point_container, *received);
